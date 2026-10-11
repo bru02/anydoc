@@ -1,0 +1,18 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@bru02/anydoc",
+      "dependencies": {
+        "@firecrawl/anydoc-wasm": "0.2.4",
+        "@llamaindex/liteparse-wasm": "2.15.1",
+      },
+    },
+  },
+  "packages": {
+    "@firecrawl/anydoc-wasm": ["@firecrawl/anydoc-wasm@0.2.4", "", {}, "sha512-ZqrTXBrwi1Ct4kB5R72KQC9fOxwq4W08bZh6T+o84Mork3xCKLpH8TRe+KM3vJ+XqRVlV1dxHvQp0cnkO2r5TQ=="],
+
+    "@llamaindex/liteparse-wasm": ["@llamaindex/liteparse-wasm@2.15.1", "", {}, "sha512-EkBfl46oFTY22hUTOa+bqRFkFilnoB0mAxqF1zXcDNipkth4+adC40QJNmYQZ0aRiAviDLGN1j8wHszYyrxNMQ=="],
+  }
+}

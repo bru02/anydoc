@@ -1,4 +1,5 @@
 /target
+/node_modules/
 /samples
 .firecrawl/
 # Digests of the local `samples/` corpus: they quote converted content, so they
