@@ -1,5 +1,11 @@
 # anydoc
 
+> **Fork note:** The root JavaScript package in this fork routes PDFs through
+> LiteParse WASM with OCR disabled, while retaining AnyDoc WASM for Office,
+> RTF, and the other document formats. It exposes the async
+> `extractMarkdownBytes` API; see [the hybrid package](hybrid/README.md).
+> The original Rust, Node binding, Python, and WASM APIs below are unchanged.
+
 [![Crates.io](https://img.shields.io/crates/v/anydoc.svg)](https://crates.io/crates/anydoc)
 [![npm](https://img.shields.io/npm/v/@firecrawl/anydoc.svg)](https://www.npmjs.com/package/@firecrawl/anydoc)
 [![PyPI](https://img.shields.io/pypi/v/firecrawl-anydoc.svg)](https://pypi.org/project/firecrawl-anydoc/)
