@@ -5,6 +5,9 @@
   "description": "AnyDoc document conversion with LiteParse PDF extraction",
   "license": "MIT",
   "repository": "github:bru02/anydoc",
+  "scripts": {
+    "test": "node --test hybrid/*.test.js"
+  },
   "exports": {
     ".": {
       "types": "./hybrid/index.d.ts",

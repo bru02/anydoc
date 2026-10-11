@@ -76,8 +76,11 @@ export async function extractMarkdownBytes(bytes, filename = "") {
     });
     try {
       const result = await parser.parse(bytes);
+      // LiteParse can emit an empty fenced block for a page containing only
+      // whitespace. Its page text is the reliable signal for searchable text.
+      const hasText = result.pages.some((page) => page.text.trim().length > 0);
       return {
-        text: result.text.trim(),
+        text: hasText ? result.text.trim() : "",
         pageErrors: result.pageErrors,
         totalPages: result.totalPages,
       };
