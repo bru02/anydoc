@@ -31,15 +31,24 @@ precompiled modules remain enabled; this package does not override that setting.
   entry points to bound concurrent memory. Neither parsing nor waiting for the
   parser runs on JS/UI threads.
 - PDFs use native LiteParse 2.17.0 and bundled PDFium. PDFium reads the file
-  using random access. LiteParse processes eight pages per batch and drops each
+  using random access. Without OCR, LiteParse processes eight pages per batch and drops each
   batch before continuing. Text returns once, bounded by `maxChars`; processing
   stops early when this cap is reached. The API does not expose a live text stream.
 - Office/RTF/EPUB/CSV use native AnyDoc 0.2.4. Its existing API accepts bytes,
   so it reads the input once into bounded native memory. ZIP/compound containers
   and PDFs require random access; neither is a forward-only byte stream.
-- OCR defaults to off. Set `ocr: "fast"` or `ocr: "accurate"` for native, on-device OCR of sparse/scanned PDF pages. iOS uses Apple Vision at the corresponding recognition level; fast renders at 144 DPI, accurate at 240 DPI. Android uses the bundled ML Kit Latin model at those render resolutions (ML Kit has no separate fast/accurate engine switch). OCR parses one page per batch and runs one recognition job at a time. No images enter JS and no document is uploaded; the Android model is included in the app, available offline on first use. Other scripts/models are not bundled.
+- OCR defaults to off. Set `ocr: "fast"` or `ocr: "accurate"` for native,
+  on-device OCR of sparse/scanned PDF pages. iOS uses Apple Vision at the
+  corresponding recognition level; fast renders at 144 DPI, accurate at 240 DPI.
+  Android uses the bundled ML Kit Latin model at those render resolutions
+  (ML Kit has no separate fast/accurate engine switch). OCR parses one page per
+  batch and runs one recognition job at a time. No images enter JS and no document
+  is uploaded; the Android model is included in the app, available offline on
+  first use. Other scripts/models are not bundled.
 - A failed PDF page preserves other readable pages and marks the result partial.
   Empty/image-only PDFs fail explicitly when OCR is off. Size/page/text caps are reported.
+  A native OCR failure also marks retained text partial. If neither OCR nor
+  embedded extraction yields text, extraction fails with the recognition error.
 - `sourceChars` uses UTF-16 units, matching JS string length. It is omitted when
   a page or early text limit means the complete document length is unknown.
 - Batching can change Markdown grouping and running-header removal at batch

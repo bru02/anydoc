@@ -49,7 +49,7 @@ private enum NativeOCR {
     request.automaticallyDetectsLanguage = true
     #if os(macOS)
     // Host contract checks use the CPU; iOS keeps Vision's device selection.
-    for (stage, devices) in request.supportedComputeStageDevices {
+    for (stage, devices) in try request.supportedComputeStageDevices {
       if let cpu = devices.first(where: { device in if case .cpu = device { return true }; return false }) {
         request.setComputeDevice(cpu, for: stage)
       }

@@ -502,6 +502,39 @@ mod tests {
             "extraction-failed"
         );
     }
+
+    #[test]
+    fn a_native_ocr_failure_preserves_other_embedded_text() {
+        unsafe extern "C" fn unavailable(
+            _data: *const u8,
+            _length: u64,
+            _width: u32,
+            _height: u32,
+            _mode: u32,
+        ) -> *mut c_char {
+            CString::new(r#"{"error":"Recognizer unavailable"}"#).unwrap().into_raw()
+        }
+        unsafe extern "C" fn release(value: *mut c_char) {
+            drop(unsafe { CString::from_raw(value) });
+        }
+        let pdfium =
+            std::env::var("ANYDOC_TEST_PDFIUM").expect("Run bun scripts/build-native.mjs host");
+        let file = tempfile::Builder::new().suffix(".pdf").tempfile().unwrap();
+        std::fs::write(file.path(), pdf_fixture(&["Native embedded marker", " "], true)).unwrap();
+        let engine = ocr::CallbackEngine { recognize: unavailable, free: release, mode: 2 };
+        let config = OcrConfig::native(2, Arc::new(engine)).unwrap();
+        let result = extract_file_with_ocr(
+            file.path().to_str().unwrap(),
+            "mixed.pdf",
+            &pdfium,
+            limits(),
+            config,
+        );
+        assert_eq!(result.status, "ok", "{result:?}");
+        assert!(result.text.unwrap().contains("Native embedded marker"));
+        assert!(result.partial);
+        assert!(result.detail.unwrap().contains("native OCR tasks failed"));
+    }
     fn limits() -> Limits {
         Limits { max_bytes: 1024 * 1024, max_chars: 100, max_pages: 100 }
     }
