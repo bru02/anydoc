@@ -22,10 +22,11 @@ class AnyDocModule : Module() {
     private val parserQueue = Executors.newSingleThreadExecutor { task ->
       Thread(task, "anydoc-parser").apply { priority = Thread.MIN_PRIORITY }
     }
-    init {
+    private val nativeLibraries by lazy {
       // Let Android's linker handle APK-backed libraries without extraction.
       System.loadLibrary("pdfium")
       System.loadLibrary("anydoc_mobile")
+      true
     }
     @JvmStatic private external fun extractNative(
       path: String, filename: String, pdfium: String,
@@ -88,12 +89,16 @@ class AnyDocModule : Module() {
     AsyncFunction("extractFile") { path: String, filename: String, maxBytes: Long, maxChars: Long, maxPages: Long, ocrMode: Long, promise: Promise ->
         parserQueue.execute {
           try {
+            // Load the parser on its first background job, away from app startup.
+            check(nativeLibraries)
             val json = JSONObject(extractNative(path, filename, "libpdfium.so", maxBytes, maxChars, maxPages, ocrMode))
             val result = mutableMapOf<String, Any>()
             for (key in json.keys()) if (!json.isNull(key)) result[key] = json.get(key)
             promise.resolve(result)
           } catch (error: Exception) {
             promise.resolve(mapOf("status" to "extraction-failed", "detail" to (error.message ?: "Native extraction failed")))
+          } catch (error: LinkageError) {
+            promise.resolve(mapOf("status" to "extraction-failed", "detail" to (error.message ?: "Native parser libraries are unavailable")))
           }
         }
     }
