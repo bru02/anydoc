@@ -75,12 +75,15 @@ async function notices(vendor, destination) {
   await cp(path.join(vendor, "licenses"), path.join(destination, "pdfium"), { recursive: true });
   await cp("LICENSE", path.join(destination, "AnyDoc-LICENSE"));
   await writeFile(path.join(destination, "LiteParse-LICENSE.txt"), "LiteParse is licensed under Apache-2.0.\nhttps://github.com/run-llama/liteparse/blob/wasm-v2.17.0/LICENSE\n");
-  // Complete transitive Rust notices are generated from the locked dependency graph.
-  run("cargo", ["about", "generate", "--locked", "--all-features", "--fail", "-m", "native/Cargo.toml", "scripts/licenses.hbs", "-o", path.join(destination, "rust-licenses.html")]);
+  await cp(path.join(output, "rust-licenses.html"), path.join(destination, "rust-licenses.html"));
 }
 
 await mkdir(output, { recursive: true });
 const platform = process.argv[2];
+if (["ios", "android"].includes(platform)) {
+  // Check the complete locked graph, including JNI, before expensive cross-compilation.
+  run("cargo", ["about", "generate", "--locked", "--all-features", "--fail", "-m", "native/Cargo.toml", "scripts/licenses.hbs", "-o", path.join(output, "rust-licenses.html")]);
+}
 if (platform === "host") {
   const vendor = await download(process.arch === "arm64" ? "pdfium-mac-arm64" : "pdfium-mac-x64");
   run("cargo", ["test", "--locked", "-p", "anydoc-mobile"], {
