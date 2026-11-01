@@ -7,9 +7,14 @@ on:
         description: Publish the validated SDK 58 package to expo-v0.2.0
         type: boolean
         default: false
+      android_run:
+        description: Optional run ID with a successful full-android artifact to reuse
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: complete-module-${{ github.ref }}
@@ -42,17 +47,25 @@ jobs:
         with:
           node-version: 24
       - uses: actions/setup-java@v5
-        if: matrix.platform == 'android'
+        if: matrix.platform == 'android' && inputs.android_run == ''
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-        if: matrix.platform == 'android'
+        if: matrix.platform == 'android' && inputs.android_run == ''
         with:
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@v5
-        if: matrix.platform == 'android'
+        if: matrix.platform == 'android' && inputs.android_run == ''
+      - uses: actions/download-artifact@v7
+        if: matrix.platform == 'android' && inputs.android_run != ''
+        with:
+          name: full-android
+          run-id: ${{ inputs.android_run }}
+          github-token: ${{ github.token }}
+          path: native/module-dist
       - name: Fetch the SHA-verified Rust/PDFium core
+        if: matrix.platform != 'android' || inputs.android_run == ''
         env:
           NATIVE_PLATFORM: ${{ matrix.platform }}
         run: |
@@ -65,6 +78,7 @@ jobs:
             cp -R android/src/main/jniLibs/. native/dist/android/jniLibs/
           fi
       - name: Compile and package the complete native module
+        if: matrix.platform != 'android' || inputs.android_run == ''
         run: bun scripts/build-module.mjs '${{ matrix.platform }}'
       - uses: actions/upload-artifact@v7
         with:

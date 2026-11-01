@@ -23,6 +23,26 @@ await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 run("bun", ["install", "--ignore-scripts"], tools);
 run("bun", ["x", "tsc", "--project", "tsconfig.json", "--noCheck"], tools);
 
+// The producer and artifact-path grammar evolve together. Use its matching
+// autolinker for tooling only; the app still uses SDK 58's published autolinker.
+const autolinker = path.join(expo, "packages/expo-modules-autolinking");
+const autolinkManifestPath = path.join(autolinker, "package.json");
+const autolinkManifest = JSON.parse(await readFile(autolinkManifestPath, "utf8"));
+for (const [name, version] of Object.entries(autolinkManifest.dependencies)) {
+  if (version.startsWith("workspace:")) autolinkManifest.dependencies[name] = requireApp(`${name}/package.json`).version;
+}
+delete autolinkManifest.devDependencies;
+delete autolinkManifest.scripts;
+await writeFile(autolinkManifestPath, JSON.stringify(autolinkManifest));
+await writeFile(path.join(autolinker, "producer-tsconfig.json"), JSON.stringify({
+  compilerOptions: { target: "es2023", module: "commonjs", esModuleInterop: true, outDir: "build", rootDir: "src", noCheck: true, types: [] },
+  include: ["src"],
+}));
+run("bun", ["install", "--ignore-scripts"], autolinker);
+run("bun", [path.join(tools, "node_modules/typescript/bin/tsc"), "--project", "producer-tsconfig.json"], autolinker);
+await rm(path.join(tools, "node_modules/expo-modules-autolinking"), { recursive: true, force: true });
+await symlink(autolinker, path.join(tools, "node_modules/expo-modules-autolinking"), "dir");
+
 const destination = path.join(expo, "packages/anydoc");
 await mkdir(destination, { recursive: true });
 for (const name of ["package.json", "expo-module.config.json", "spm.config.json", "ios"]) {
