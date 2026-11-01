@@ -100,7 +100,7 @@ jobs:
         run: bun scripts/build-native.mjs ios
         env:
           ANYDOC_PDFIUM_FROM_CI: '1'
-      - name: Compile the Swift Expo adapter against SDK 58 (device build only)
+      - name: Link an unsigned Expo SDK 58 iOS device app (no simulator)
         run: bun scripts/check-expo.mjs ios
       - uses: actions/upload-artifact@v6
         with:
@@ -133,7 +133,7 @@ jobs:
           path: native/vendor
       - name: Prebuild JNI and PDFium for all four Android ABIs
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.1.12297006" ANYDOC_PDFIUM_FROM_CI=1 bun scripts/build-native.mjs android
-      - name: Compile the Kotlin Expo adapter against SDK 58 (no emulator)
+      - name: Build an Expo SDK 58 Android APK including the native module (no emulator)
         run: bun scripts/check-expo.mjs android
       - uses: actions/upload-artifact@v6
         with:

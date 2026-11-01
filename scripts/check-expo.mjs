@@ -17,7 +17,7 @@ await writeFile(path.join(sample, "app.json"), JSON.stringify({ expo: {
   name: "AnyDocCheck", slug: "anydoc-check", ios: { bundleIdentifier: "app.anydoc.check", deploymentTarget: "17.0" },
   android: { package: "app.anydoc.check" },
 } }));
-await writeFile(path.join(sample, "App.js"), "export default function App() { return null; }\n");
+await writeFile(path.join(sample, "App.js"), "import { isAvailable } from '@bru02/anydoc/expo';\nexport default function App() { isAvailable(); return null; }\n");
 function run(command, args, cwd = sample) {
   const result = spawnSync(command, args, { cwd, stdio: "inherit", env: { ...process.env, CI: "1", ANYDOC_SKIP_NATIVE_DOWNLOAD: "1" } });
   if (result.status !== 0) throw new Error(`${command} failed: ${result.status}`);
@@ -34,5 +34,5 @@ if (platform === "ios") {
   run("xcodebuild", ["-workspace", "AnyDocCheck.xcworkspace", "-scheme", "AnyDocCheck", "-configuration", "Release", "-sdk", "iphoneos", "-destination", "generic/platform=iOS", "CODE_SIGNING_ALLOWED=NO"], path.join(sample, "ios"));
 } else {
   // Artifact files were supplied by this job; no release download is needed.
-  run("./gradlew", [":bru02-anydoc:compileReleaseKotlin", "-x", "prepareAnyDocNative", "--no-daemon"], path.join(sample, "android"));
+  run("./gradlew", [":app:assembleRelease", "-x", "prepareAnyDocNative", "--no-daemon"], path.join(sample, "android"));
 }
