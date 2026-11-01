@@ -3,6 +3,7 @@
 The public hybrid package also provides a native module for iOS 17+ and Android
 API 24+, with Expo Modules autolinking. Use a development build, not Expo Go.
 React Native projects without Expo need Expo Modules installed first.
+Set `ios.deploymentTarget` to at least `"17.0"` in the Expo app config.
 
 ```ts
 import { extractFile } from '@bru02/anydoc/expo';

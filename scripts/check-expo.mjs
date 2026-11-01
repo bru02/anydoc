@@ -14,7 +14,7 @@ await writeFile(path.join(sample, "package.json"), JSON.stringify({
   dependencies: { expo: "~58.0.22", react: "19.3.1", "react-native": "0.88.1", "@bru02/anydoc": "file:../.." },
 }));
 await writeFile(path.join(sample, "app.json"), JSON.stringify({ expo: {
-  name: "AnyDocCheck", slug: "anydoc-check", ios: { bundleIdentifier: "app.anydoc.check" },
+  name: "AnyDocCheck", slug: "anydoc-check", ios: { bundleIdentifier: "app.anydoc.check", deploymentTarget: "17.0" },
   android: { package: "app.anydoc.check" },
 } }));
 await writeFile(path.join(sample, "App.js"), "export default function App() { return null; }\n");
@@ -31,7 +31,7 @@ run("bun", ["install", "--ignore-scripts"]);
 run("bun", ["x", "expo", "prebuild", "--platform", platform, "--no-install", "--no-clean"]);
 if (platform === "ios") {
   run("pod", ["install"], path.join(sample, "ios"));
-  run("xcodebuild", ["-project", "Pods/Pods.xcodeproj", "-target", "AnyDoc", "-configuration", "Release", "-sdk", "iphoneos", "CODE_SIGNING_ALLOWED=NO"], path.join(sample, "ios"));
+  run("xcodebuild", ["-workspace", "AnyDocCheck.xcworkspace", "-scheme", "AnyDocCheck", "-configuration", "Release", "-sdk", "iphoneos", "-destination", "generic/platform=iOS", "CODE_SIGNING_ALLOWED=NO"], path.join(sample, "ios"));
 } else {
   // Artifact files were supplied by this job; no release download is needed.
   run("./gradlew", [":bru02-anydoc:compileReleaseKotlin", "-x", "prepareAnyDocNative", "--no-daemon"], path.join(sample, "android"));
