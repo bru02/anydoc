@@ -21,7 +21,7 @@ if (platform === "android") {
   for (const file of ["AnyDocModule.swift", "NativeOCR.swift"]) await rm(path.join(pkg, "ios", file));
   const ios = path.join(directory, "ios");
   if (!existsSync(path.join(ios, "Pods/AnyDoc/AnyDoc.xcframework"))) throw new Error("CocoaPods did not install the precompiled module");
-  run("ruby", ["-rxcodeproj", "-e", "p=Xcodeproj::Project.open('Pods/Pods.xcodeproj'); t=p.targets.find{|x|x.name=='AnyDoc'}; abort('AnyDoc Swift sources are still compiled') if t && t.source_build_phase.files.any?"], ios);
+  run("ruby", ["-rxcodeproj", "-e", "p=Xcodeproj::Project.open('Pods/Pods.xcodeproj'); t=p.targets.find{|x|x.name=='AnyDoc'}; abort('AnyDoc target missing') unless t; abort('AnyDoc Swift sources are still compiled') if t.build_phases.any?{|phase| phase.is_a?(Xcodeproj::Project::Object::PBXSourcesBuildPhase) && phase.files.any?}"], ios);
   for (const [configuration, sdk, destination] of [["Release", "iphoneos", "generic/platform=iOS"], ["Debug", "iphonesimulator", "generic/platform=iOS Simulator"]]) {
     run("xcodebuild", ["-workspace", "AnyDocCheck.xcworkspace", "-scheme", "AnyDocCheck", "-configuration", configuration, "-sdk", sdk, "-destination", destination, "CODE_SIGNING_ALLOWED=NO"], ios);
   }

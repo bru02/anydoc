@@ -11,6 +11,10 @@ on:
         description: Optional run ID with a successful full-android artifact to reuse
         type: string
         default: ''
+      package_run:
+        description: Optional run ID with an assembled sdk58-package to recheck without rebuilding
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,6 +30,7 @@ env:
 
 jobs:
   build:
+    if: inputs.package_run == ''
     strategy:
       fail-fast: false
       matrix:
@@ -88,16 +93,26 @@ jobs:
 
   package:
     needs: build
+    if: always() && (inputs.package_run != '' || needs.build.result == 'success')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - uses: actions/download-artifact@v7
+        if: inputs.package_run == ''
         with:
           pattern: full-*
           merge-multiple: true
           path: native/module-dist
+      - uses: actions/download-artifact@v7
+        if: inputs.package_run != ''
+        with:
+          name: sdk58-package
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: native/module-dist
       - name: Assemble the installable package
+        if: inputs.package_run == ''
         run: |
           tar -xzf native/module-dist/full-ios.tar.gz
           tar -xzf native/module-dist/full-android.tar.gz
