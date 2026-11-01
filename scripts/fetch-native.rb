@@ -34,7 +34,9 @@ File.open(File.join(File.dirname(destination), '.anydoc-install.lock'), 'w') do 
     FileUtils.rm_rf(destination)
     FileUtils.cp_r(source, destination)
     if platform == 'android'
-      FileUtils.cp_r(File.join(unpacked, 'Licenses'), File.join(root, 'android/Licenses'))
+      licenses = File.join(root, 'android/Licenses')
+      FileUtils.rm_rf(licenses)
+      FileUtils.cp_r(File.join(unpacked, 'Licenses'), licenses)
     end
     File.write(stamp, entry.fetch('sha256'))
   end
