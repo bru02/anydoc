@@ -15,6 +15,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  host:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ios
+          key: anydoc-ios
+          cache-on-failure: true
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      - run: cargo fmt --all --check
+      - name: Native host tests against the pinned LiteParse PDFium fork
+        run: bun scripts/build-native.mjs host
+
   pdfium-ios:
     strategy:
       fail-fast: false
@@ -43,7 +62,7 @@ jobs:
       cpu: ${{ matrix.cpu }}
 
   ios:
-    needs: pdfium-ios
+    needs: [pdfium-ios, host]
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
@@ -63,8 +82,6 @@ jobs:
         with:
           pattern: pdfium-ios-*
           path: native/vendor
-      - name: Native host tests against the pinned LiteParse PDFium fork
-        run: bun scripts/build-native.mjs host
       - name: Cross-compile device and simulator libraries (never boot a simulator)
         run: bun scripts/build-native.mjs ios
         env:
