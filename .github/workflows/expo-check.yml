@@ -1,0 +1,44 @@
+name: Expo adapter checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Expo platform to build
+        type: choice
+        options: [ios, android]
+        default: ios
+      native_run:
+        description: Native prebuild workflow run containing the compiled parser artifact
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  check:
+    runs-on: ${{ inputs.platform == 'ios' && 'macos-15' || 'ubuntu-24.04' }}
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      NATIVE_PLATFORM: ${{ inputs.platform }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: android-actions/setup-android@v3
+        if: inputs.platform == 'android'
+        with:
+          packages: platform-tools
+      - uses: actions/download-artifact@v7
+        with:
+          name: anydoc-${{ inputs.platform }}
+          run-id: ${{ inputs.native_run }}
+          github-token: ${{ github.token }}
+          path: native/dist
+      - name: Unpack the prebuilt parser
+        run: |
+          mkdir -p "native/dist/$NATIVE_PLATFORM"
+          tar -xzf "native/dist/anydoc-$NATIVE_PLATFORM.tar.gz" -C "native/dist/$NATIVE_PLATFORM"
+      - name: Build a complete Expo SDK 58 app without starting a simulator or emulator
+        run: bun scripts/check-expo.mjs "$NATIVE_PLATFORM"

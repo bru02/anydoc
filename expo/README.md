@@ -81,6 +81,11 @@ consumers adopt that package revision. Tags/assets must not be overwritten.
 PDFium mobile binaries are built from the same pinned LiteParse fork as the desktop engine, with build/source revisions in `native/pdfium.json`. Desktop host-test inputs are pinned by SHA-256. Stock PDFium does not export the fork APIs required by LiteParse and must not be substituted.
 Simulator **compilation** is supported without launching a simulator.
 
+The separate `Expo adapter checks` workflow accepts a native prebuild run ID.
+Use it to validate Swift/Kotlin or Expo integration changes against existing
+parser artifacts without recompiling Rust or PDFium. The iOS jobs select Xcode
+26.3 explicitly; the runner's older default Swift compiler cannot build SDK 58.
+
 For source development, use `bun scripts/build-native.mjs host|ios|android`.
 Android source builds require Linux and `ANDROID_NDK_HOME`; iOS requires Xcode.
 These commands explicitly rebuild source and are not part of consumer builds.
