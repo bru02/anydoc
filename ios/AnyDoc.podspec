@@ -20,10 +20,10 @@ Pod::Spec.new do |s|
   s.swift_version = '5.9'
   s.static_framework = true
   s.dependency 'ExpoModulesCore'
-  s.source_files = 'AnyDocModule.swift'
+  s.source_files = '*.swift'
   s.vendored_frameworks = 'Frameworks/AnyDocCore.xcframework', 'Frameworks/pdfium.xcframework'
   s.preserve_paths = 'Frameworks/Licenses/**/*'
   s.libraries = 'c++', 'iconv', 'resolv'
-  s.frameworks = 'Security', 'SystemConfiguration'
+  s.frameworks = 'Security', 'SystemConfiguration', 'Vision', 'CoreGraphics'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
 end

@@ -19,3 +19,8 @@ def prepareNative = tasks.register('prepareAnyDocNative', Exec) {
   outputs.dir file('src/main/jniLibs')
 }
 tasks.named('preBuild').configure { dependsOn prepareNative }
+
+dependencies {
+  // Bundled Latin-script model: available offline on first use, no Play Services download.
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
+}

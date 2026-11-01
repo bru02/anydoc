@@ -3,11 +3,15 @@ use std::ffi::{CStr, CString, c_char};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::Mutex;
 
 use liteparse::types::PdfInput;
 use liteparse::{LiteParse, LiteParseConfig, OutputFormat};
 use serde::Serialize;
+
+mod ocr;
+use ocr::OcrConfig;
 
 // Bound concurrent memory use even when different native hosts call the C ABI.
 static PARSE_SLOT: Mutex<()> = Mutex::new(());
@@ -69,8 +73,18 @@ fn local_path(raw: &str) -> Result<PathBuf, String> {
 
 /// Reads from disk directly. PDFium uses random file access, not a JS byte buffer.
 pub fn extract_file(raw: &str, filename: &str, pdfium_path: &str, limits: Limits) -> Extraction {
+    extract_file_with_ocr(raw, filename, pdfium_path, limits, OcrConfig::default())
+}
+
+fn extract_file_with_ocr(
+    raw: &str,
+    filename: &str,
+    pdfium_path: &str,
+    limits: Limits,
+    ocr: OcrConfig,
+) -> Extraction {
     let _slot = PARSE_SLOT.lock().unwrap_or_else(|e| e.into_inner());
-    match extract_inner(raw, filename, pdfium_path, limits) {
+    match extract_inner(raw, filename, pdfium_path, limits, ocr) {
         Ok(result) => result,
         Err(detail) => Extraction::failure("extraction-failed", detail),
     }
@@ -81,6 +95,7 @@ fn extract_inner(
     filename: &str,
     pdfium_path: &str,
     limits: Limits,
+    ocr: OcrConfig,
 ) -> Result<Extraction, String> {
     if limits.max_bytes == 0 || limits.max_chars == 0 || limits.max_pages == 0 {
         return Err("Extraction limits must be positive".into());
@@ -106,13 +121,13 @@ fn extract_inner(
         // Cached / mislabeled PDF paths need a .pdf alias, not a byte copy or an
         // attempted LibreOffice conversion. The temporary link owns no input bytes.
         if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("pdf")) {
-            return extract_pdf(&path, pdfium_path, limits);
+            return extract_pdf(&path, pdfium_path, limits, ocr);
         }
         let alias =
             tempfile::Builder::new().prefix("anydoc-pdf-").tempdir().map_err(|e| e.to_string())?;
         let pdf_path = alias.path().join("input.pdf");
         std::os::unix::fs::symlink(&path, &pdf_path).map_err(|e| e.to_string())?;
-        return extract_pdf(&pdf_path, pdfium_path, limits);
+        return extract_pdf(&pdf_path, pdfium_path, limits, ocr);
     }
 
     // Office containers need random access too. One bounded native allocation;
@@ -150,24 +165,39 @@ fn extract_inner(
     Ok(output.finish(false, Vec::new()))
 }
 
-fn extract_pdf(path: &Path, pdfium_path: &str, limits: Limits) -> Result<Extraction, String> {
+fn extract_pdf(
+    path: &Path,
+    pdfium_path: &str,
+    limits: Limits,
+    ocr: OcrConfig,
+) -> Result<Extraction, String> {
     // Explicit bundled path avoids global environment mutation and desktop paths.
     liteparse_pdfium_sys::dynamic::load(Path::new(pdfium_path))?;
+    let enabled = ocr.engine.is_some();
     let parser = LiteParse::new(LiteParseConfig {
-        ocr_enabled: false,
+        ocr_enabled: enabled,
+        dpi: if ocr.mode == 2 { 240.0 } else { 144.0 },
+        num_workers: 1,
         output_format: OutputFormat::Markdown,
         continue_on_page_error: true,
         max_pages: limits.max_pages,
         quiet: true,
         ..Default::default()
     });
+    let parser = match &ocr.engine {
+        Some(engine) => parser.with_ocr_engine(engine.clone()),
+        None => parser,
+    };
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
     runtime.block_on(async {
         let mut session = parser
-            .open_batch_session(PdfInput::Path(path.to_string_lossy().into_owned()), BATCH_PAGES)
+            .open_batch_session(
+                PdfInput::Path(path.to_string_lossy().into_owned()),
+                if enabled { 1 } else { BATCH_PAGES },
+            )
             .await
             .map_err(|e| e.to_string())?;
         let total_pages = session.total_pages();
@@ -190,6 +220,10 @@ fn extract_pdf(path: &Path, pdfium_path: &str, limits: Limits) -> Result<Extract
             }
         }
         let mut details = Vec::new();
+        let ocr_failures = ocr.failures();
+        if ocr_failures > 0 {
+            details.push(format!("{ocr_failures} native OCR tasks failed"));
+        }
         if errors > 0 {
             details.push(format!("{errors} PDF pages failed to parse"));
         }
@@ -200,7 +234,11 @@ fn extract_pdf(path: &Path, pdfium_path: &str, limits: Limits) -> Result<Extract
         if output.text.trim().is_empty() {
             return Ok(Extraction::failure(
                 "extraction-failed",
-                "No extractable text found; OCR is disabled",
+                if enabled {
+                    "No text found by embedded extraction or native OCR"
+                } else {
+                    "No extractable text found; OCR is disabled"
+                },
             ));
         }
         Ok(output.finish(incomplete, details))
@@ -246,9 +284,17 @@ impl BoundedText {
     }
 }
 
-fn guarded_extract(path: &str, filename: &str, pdfium_path: &str, limits: Limits) -> String {
-    let result = std::panic::catch_unwind(|| extract_file(path, filename, pdfium_path, limits))
-        .unwrap_or_else(|_| Extraction::failure("extraction-failed", "Native parser panicked"));
+fn guarded_extract(
+    path: &str,
+    filename: &str,
+    pdfium_path: &str,
+    limits: Limits,
+    ocr: OcrConfig,
+) -> String {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        extract_file_with_ocr(path, filename, pdfium_path, limits, ocr)
+    }))
+    .unwrap_or_else(|_| Extraction::failure("extraction-failed", "Native parser panicked"));
     serde_json::to_string(&result).expect("Extraction is JSON serializable")
 }
 
@@ -262,6 +308,9 @@ pub unsafe extern "C" fn anydoc_mobile_extract(
     max_bytes: u64,
     max_chars: u32,
     max_pages: u32,
+    ocr_mode: u32,
+    recognize: Option<ocr::RecognizeCallback>,
+    free_ocr: Option<ocr::FreeCallback>,
 ) -> *mut c_char {
     let result = (|| {
         if path.is_null() || filename.is_null() || pdfium_path.is_null() {
@@ -273,11 +322,22 @@ pub unsafe extern "C" fn anydoc_mobile_extract(
         let pdfium = unsafe { CStr::from_ptr(pdfium_path) }
             .to_str()
             .map_err(|_| "PDFium path is not UTF-8")?;
+        let ocr = if ocr_mode == 0 {
+            OcrConfig::default()
+        } else {
+            let engine = ocr::CallbackEngine {
+                recognize: recognize.ok_or("Native OCR callback is missing")?,
+                free: free_ocr.ok_or("Native OCR release callback is missing")?,
+                mode: ocr_mode,
+            };
+            OcrConfig::native(ocr_mode, Arc::new(engine)).map_err(|_| "Invalid OCR mode")?
+        };
         Ok(guarded_extract(
             path,
             filename,
             pdfium,
             Limits { max_bytes, max_chars: max_chars as usize, max_pages: max_pages as usize },
+            ocr,
         ))
     })()
     .unwrap_or_else(|error| {
@@ -302,12 +362,16 @@ mod android;
 mod tests {
     use super::*;
     fn pdf(lines: &[&str]) -> Vec<u8> {
+        pdf_fixture(lines, false)
+    }
+    fn pdf_fixture(lines: &[&str], scan: bool) -> Vec<u8> {
         let mut objects = vec![String::from("<</Type/Catalog/Pages 2 0 R>>"), String::new()];
         let mut kids = Vec::new();
         for line in lines {
             let page = objects.len() + 1;
             kids.push(format!("{page} 0 R"));
-            let stream = format!("BT /F1 12 Tf 10 100 Td ({line}) Tj ET\n");
+            let drawing = if scan { "q 0 0 0 rg 20 20 150 120 re f Q\n" } else { "" };
+            let stream = format!("{drawing}BT /F1 12 Tf 10 100 Td ({line}) Tj ET\n");
             objects.push(format!("<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents {} 0 R/Resources<</Font<</F1 {} 0 R>>>>>>", page + 1, page + 2));
             objects.push(format!("<</Length {}>>stream\n{stream}endstream", stream.len()));
             objects.push("<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>".into());
@@ -329,6 +393,48 @@ mod tests {
             objects.len() + 1
         ));
         result.into_bytes()
+    }
+
+    #[test]
+    fn native_ocr_callback_is_opt_in_and_uses_quality_resolution() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static WIDTH: AtomicU32 = AtomicU32::new(0);
+        unsafe extern "C" fn recognize(
+            _bytes: *const u8,
+            length: u64,
+            width: u32,
+            height: u32,
+            _mode: u32,
+        ) -> *mut c_char {
+            assert_eq!(length, u64::from(width) * u64::from(height) * 3);
+            WIDTH.store(width, Ordering::Relaxed);
+            CString::new(
+                r#"[{"text":"Native OCR marker","bbox":[20,20,180,50],"confidence":0.99}]"#,
+            )
+            .unwrap()
+            .into_raw()
+        }
+        unsafe extern "C" fn release(value: *mut c_char) {
+            drop(unsafe { CString::from_raw(value) });
+        }
+        let pdfium =
+            std::env::var("ANYDOC_TEST_PDFIUM").expect("Run bun scripts/build-native.mjs host");
+        let file = tempfile::Builder::new().suffix(".pdf").tempfile().unwrap();
+        std::fs::write(file.path(), pdf_fixture(&[" "], true)).unwrap();
+        let path = file.path().to_str().unwrap();
+        let result = extract_file(path, "scan.pdf", &pdfium, limits());
+        assert_eq!(result.status, "extraction-failed");
+        assert_eq!(WIDTH.load(Ordering::Relaxed), 0);
+        let mut widths = Vec::new();
+        for mode in [1, 2] {
+            let engine = ocr::CallbackEngine { recognize, free: release, mode };
+            let config = OcrConfig::native(mode, Arc::new(engine)).unwrap();
+            let result = extract_file_with_ocr(path, "scan.pdf", &pdfium, limits(), config);
+            assert_eq!(result.status, "ok", "{result:?}");
+            assert!(result.text.unwrap().contains("Native OCR marker"));
+            widths.push(WIDTH.load(Ordering::Relaxed));
+        }
+        assert!(widths[1] > widths[0]);
     }
 
     #[test]

@@ -9,10 +9,11 @@ public final class AnyDocModule: Module {
   public func definition() -> ModuleDefinition {
     Name("AnyDoc")
 
-    AsyncFunction("extractFile") { (path: String, filename: String, maxBytes: Int, maxChars: Int, maxPages: Int) throws -> [String: Any] in
+    AsyncFunction("extractFile") { (path: String, filename: String, maxBytes: Int, maxChars: Int, maxPages: Int, ocrMode: Int) throws -> [String: Any] in
       try autoreleasepool {
         guard maxBytes > 0, maxChars > 0, maxPages > 0,
           maxChars <= Int(UInt32.max), maxPages <= Int(UInt32.max),
+          (0...2).contains(ocrMode),
           !path.contains("\0"), !filename.contains("\0") else {
           return ["status": "extraction-failed", "detail": "Invalid path or extraction limits"]
         }
@@ -20,7 +21,7 @@ public final class AnyDocModule: Module {
           return ["status": "extraction-failed", "detail": "Application frameworks directory is unavailable"]
         }
         let pdfiumPath = frameworks.appendingPathComponent("pdfium.framework/pdfium").path
-        guard let result = anydoc_mobile_extract(path, filename, pdfiumPath, UInt64(maxBytes), UInt32(maxChars), UInt32(maxPages)) else {
+        guard let result = anydoc_mobile_extract(path, filename, pdfiumPath, UInt64(maxBytes), UInt32(maxChars), UInt32(maxPages), UInt32(ocrMode), nativeOcrRecognize, nativeOcrFree) else {
           return ["status": "extraction-failed", "detail": "Native parser returned no result"]
         }
         defer { anydoc_mobile_free(result) }

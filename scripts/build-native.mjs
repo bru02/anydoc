@@ -93,7 +93,6 @@ if (platform === "host") {
   await mkdir(destination, { recursive: true });
   // Combine architectures only within the simulator platform.
   run("lipo", ["-create", "target/aarch64-apple-ios-sim/release/libanydoc_mobile.a", "target/x86_64-apple-ios/release/libanydoc_mobile.a", "-output", path.join(destination, "libanydoc_sim.a")]);
-  await writeFile("native/include/module.modulemap", 'module AnyDocCore { header "anydoc_mobile.h" export * }\n');
   run("xcodebuild", ["-create-xcframework", "-library", path.join(root, "target/aarch64-apple-ios/release/libanydoc_mobile.a"), "-headers", path.join(root, "native/include"), "-library", path.join(destination, "libanydoc_sim.a"), "-headers", path.join(root, "native/include"), "-output", path.join(destination, "AnyDocCore.xcframework")]);
   const simFramework = path.join(destination, "sim/pdfium.framework");
   const deviceFramework = path.join(destination, "device/pdfium.framework");

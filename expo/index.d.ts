@@ -5,6 +5,8 @@ export interface ExtractOptions {
   maxChars?: number;
   /** Default 1000. PDF pages are processed in batches of eight. */
   maxPages?: number;
+  /** Native on-device OCR for sparse/scanned PDF pages. Default off. */
+  ocr?: "off" | "fast" | "accurate";
 }
 
 export type ExtractionResult =

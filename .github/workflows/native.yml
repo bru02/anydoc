@@ -33,6 +33,11 @@ jobs:
       - run: cargo fmt --all --check
       - name: Native host tests against the pinned LiteParse PDFium fork
         run: bun scripts/build-native.mjs host
+      - name: Test real Apple Vision fast and accurate OCR on generated text (no simulator)
+        run: |
+          mkdir -p native/dist
+          swiftc -I native/include ios/NativeOCR.swift scripts/vision-smoke.swift -framework Vision -framework CoreGraphics -framework CoreText -o native/dist/vision-smoke
+          native/dist/vision-smoke
 
   pdfium-ios:
     strategy:

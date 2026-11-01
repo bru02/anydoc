@@ -15,7 +15,15 @@ const { extractFile, isAvailable } = await import("./index.js");
 test("only paths and bounded limits cross the native bridge", async () => {
   expect(isAvailable()).toBe(true);
   expect(await extractFile("file:///cache/deck.pptx", "deck.pptx")).toEqual({ status: "ok", text: "Native text" });
-  expect(calls.at(-1)).toEqual(["file:///cache/deck.pptx", "deck.pptx", 67108864, 1000000, 1000]);
+  expect(calls.at(-1)).toEqual(["file:///cache/deck.pptx", "deck.pptx", 67108864, 1000000, 1000, 0]);
+});
+
+test("native OCR is explicit and selects the requested quality", async () => {
+  await extractFile("/cache/a.pdf", "a.pdf", { ocr: "fast" });
+  expect(calls.at(-1)?.at(-1)).toBe(1);
+  await extractFile("/cache/a.pdf", "a.pdf", { ocr: "accurate" });
+  expect(calls.at(-1)?.at(-1)).toBe(2);
+  await expect(extractFile("/cache/a.pdf", "a.pdf", { ocr: "cloud" as never })).rejects.toThrow(RangeError);
 });
 
 test("rejects invalid limits and NUL paths before native conversion", async () => {
