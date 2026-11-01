@@ -1,4 +1,5 @@
-# Downloads a pinned release once, verifies SHA-256, then installs atomically.
+# Downloads a pinned release once and verifies SHA-256 before installation.
+# The lock and completion stamp prevent reusing a partial installation.
 # No Rust toolchain, PDFium compilation, Node process, or simulator is needed.
 require 'json'
 require 'digest'

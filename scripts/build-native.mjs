@@ -56,7 +56,9 @@ async function framework(vendor, destination, simulator) {
 async function build(target, asset, options = {}) {
   const vendor = await download(asset);
   run("rustup", ["target", "add", target]);
-  const args = ["build", "--locked", "--release", "-p", "anydoc-mobile", "--target", target];
+  // Emit only the binary the platform consumes, rather than linking unused
+  // staticlib/cdylib/rlib variants for every architecture.
+  const args = ["rustc", "--lib", "--crate-type", options.android ? "cdylib" : "staticlib", "--locked", "--release", "-p", "anydoc-mobile", "--target", target];
   if (options.android) args.push("--features", "android-jni");
   run("cargo", args, {
     PDFIUM_LIB_PATH: path.join(vendor, "lib"),
@@ -131,8 +133,12 @@ if (platform === "host") {
     await cp(path.join(vendor, "lib/libpdfium.so"), path.join(libs, "libpdfium.so"));
     for (const lib of ["libanydoc_mobile.so", "libpdfium.so"]) {
       const result = spawnSync(path.join(bin, "llvm-readelf"), ["-lW", path.join(libs, lib)], { encoding: "utf8" });
-      if (result.status !== 0 || result.stdout.split("\n").filter(line => line.trim().startsWith("LOAD")).some(line => Number(line.trim().split(/\s+/).at(-1)) < 16384)) {
-        throw new Error(`${abi}/${lib} is not 16 KiB page-aligned`);
+      // Android's flexible page-size requirement applies to the 64-bit ABIs.
+      // https://android.googlesource.com/platform/ndk/+/master/docs/BuildSystemMaintainers.md
+      const requiredAlignment = ["arm64-v8a", "x86_64"].includes(abi) ? 16384 : 4096;
+      const loads = result.stdout.split("\n").filter(line => line.trim().startsWith("LOAD"));
+      if (result.status !== 0 || loads.length === 0 || loads.some(line => Number(line.trim().split(/\s+/).at(-1)) < requiredAlignment)) {
+        throw new Error(`${abi}/${lib} does not meet ${requiredAlignment}-byte ELF alignment`);
       }
     }
   }

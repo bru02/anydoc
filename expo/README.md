@@ -70,8 +70,8 @@ PDFium fork, then cross-compiles:
 
 - iOS arm64 device + arm64/x86_64 simulator slices in `AnyDocCore.xcframework`
   and a separate embedded `pdfium.xcframework`;
-- Android arm64-v8a, armeabi-v7a, x86_64 and x86 Rust JNI/PDFium libraries, checked
-  for 16 KiB LOAD alignment;
+- Android arm64-v8a, armeabi-v7a, x86_64 and x86 Rust JNI/PDFium libraries, with
+  16 KiB LOAD alignment checked for 64-bit ABIs and 4 KiB for 32-bit ABIs;
 - upstream and transitive dependency license notices.
 
 It never boots a simulator or emulator. Push a new `native-v*` tag to publish

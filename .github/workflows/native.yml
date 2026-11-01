@@ -2,6 +2,12 @@ name: Native prebuilds
 
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Native platform to build
+        type: choice
+        options: [both, ios, android]
+        default: both
   push:
     tags: ['native-v*']
   pull_request:
@@ -40,6 +46,7 @@ jobs:
           native/dist/vision-smoke
 
   pdfium-ios:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'android'
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +64,7 @@ jobs:
       environment: ${{ matrix.environment }}
 
   pdfium-android:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'ios'
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +75,7 @@ jobs:
       cpu: ${{ matrix.cpu }}
 
   ios:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'android'
     needs: [pdfium-ios, host]
     runs-on: macos-15
     steps:
@@ -101,6 +110,7 @@ jobs:
           retention-days: 14
 
   android:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'ios'
     needs: pdfium-android
     runs-on: ubuntu-24.04
     steps:
