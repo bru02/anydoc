@@ -93,7 +93,7 @@ jobs:
 
   package:
     needs: build
-    if: always() && (inputs.package_run != '' || needs.build.result == 'success')
+    if: ${{ !cancelled() && (inputs.package_run != '' || needs.build.result == 'success') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -134,7 +134,7 @@ jobs:
 
   consume:
     needs: package
-    if: always() && needs.package.result == 'success'
+    if: ${{ !cancelled() && needs.package.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -169,7 +169,7 @@ jobs:
 
   publish:
     needs: consume
-    if: always() && inputs.publish && needs.consume.result == 'success'
+    if: ${{ !cancelled() && inputs.publish && needs.consume.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
