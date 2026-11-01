@@ -11,7 +11,7 @@ on:
   push:
     tags: ['native-v*']
   pull_request:
-    paths: ['native/**', 'ios/**', 'android/**', 'expo/**', 'src/**', 'Cargo.*', 'scripts/*native*', '.github/workflows/native.yml']
+    paths: ['native/**', 'ios/**', 'android/**', 'expo/**', 'src/**', 'Cargo.*', 'scripts/*native*', 'scripts/check-expo.mjs', 'scripts/vision-smoke.swift', 'scripts/licenses.hbs', 'about.toml', 'package.json', 'bun.lock', '.github/workflows/native.yml', '.github/workflows/pdfium.yml']
 
 permissions:
   contents: read
@@ -31,8 +31,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ios
-          key: anydoc-ios
+          key: anydoc-host
           cache-on-failure: true
       - run: bun install --frozen-lockfile
       - run: bun run test
@@ -86,7 +85,8 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          key: anydoc-ios
+          key: anydoc-ios-all-targets-v2
+          cache-workspace-crates: true
           cache-on-failure: true
       - run: cargo install cargo-about --version 0.9.3 --features cli --locked
       - run: bun install --frozen-lockfile
@@ -119,7 +119,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: anydoc-android
+          key: anydoc-android-all-targets-v2
+          cache-workspace-crates: true
           cache-on-failure: true
       - uses: android-actions/setup-android@v3
         with:
