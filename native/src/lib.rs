@@ -102,7 +102,17 @@ fn extract_inner(
     let is_pdf = filename.to_ascii_lowercase().ends_with(".pdf")
         || prefix[..read].windows(5).any(|part| part == b"%PDF-");
     if is_pdf {
-        return extract_pdf(&path, pdfium_path, limits);
+        // LiteParse's native path API routes by extension before opening PDFium.
+        // Cached / mislabeled PDF paths need a .pdf alias, not a byte copy or an
+        // attempted LibreOffice conversion. The temporary link owns no input bytes.
+        if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("pdf")) {
+            return extract_pdf(&path, pdfium_path, limits);
+        }
+        let alias =
+            tempfile::Builder::new().prefix("anydoc-pdf-").tempdir().map_err(|e| e.to_string())?;
+        let pdf_path = alias.path().join("input.pdf");
+        std::os::unix::fs::symlink(&path, &pdf_path).map_err(|e| e.to_string())?;
+        return extract_pdf(&pdf_path, pdfium_path, limits);
     }
 
     // Office containers need random access too. One bounded native allocation;
@@ -325,7 +335,8 @@ mod tests {
     fn pdf_batches_keep_readable_pages_and_report_early_stops() {
         let pdfium =
             std::env::var("ANYDOC_TEST_PDFIUM").expect("Run bun scripts/build-native.mjs host");
-        let file = tempfile::Builder::new().suffix(".pdf").tempfile().unwrap();
+        // An extensionless cache path must remain file-backed and never invoke a converter.
+        let file = tempfile::NamedTempFile::new().unwrap();
         let lines = [
             "First marker",
             "   ",
