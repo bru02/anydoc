@@ -1,0 +1,85 @@
+name: Native prebuilds
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['native-v*']
+  pull_request:
+    paths: ['native/**', 'ios/**', 'android/**', 'expo/**', 'src/**', 'Cargo.*', 'scripts/*native*', '.github/workflows/native.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: anydoc-ios
+      - run: cargo install cargo-about --locked
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      - run: cargo fmt --all --check
+      - name: Native host tests against pinned stock PDFium
+        run: bun scripts/build-native.mjs host
+      - name: Cross-compile device and simulator libraries (never boot a simulator)
+        run: bun scripts/build-native.mjs ios
+      - uses: actions/upload-artifact@v6
+        with:
+          name: anydoc-ios
+          path: native/dist/anydoc-ios.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: anydoc-android
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'ndk;27.1.12297006'
+      - run: cargo install cargo-about --locked
+      - name: Prebuild JNI and PDFium for all four Android ABIs
+        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.1.12297006" bun scripts/build-native.mjs android
+      - uses: actions/upload-artifact@v6
+        with:
+          name: anydoc-android
+          path: native/dist/anydoc-android.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/native-v')
+    needs: [ios, android]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: anydoc-*
+          path: artifacts
+          merge-multiple: true
+      - name: Publish immutable parser artifacts and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cd artifacts
+          sha256sum anydoc-*.tar.gz > SHA256SUMS
+          gh release create "$RELEASE_TAG" anydoc-*.tar.gz SHA256SUMS --verify-tag --title "$RELEASE_TAG" --notes 'Precompiled AnyDoc Rust core, LiteParse 2.17.0 and PDFium chromium/8125. iOS device/simulator and four Android ABIs. Source paths only cross the JS bridge; OCR is disabled.'

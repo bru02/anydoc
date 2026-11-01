@@ -17,3 +17,10 @@ __pycache__/
 /fuzz/corpus/
 /fuzz/artifacts/
 /fuzz/coverage/
+/native/vendor/
+/ios/Frameworks/
+/android/src/main/jniLibs/
+/native/dist/
+/ios/.anydoc-install.lock
+/android/src/main/.anydoc-install.lock
+/android/Licenses/

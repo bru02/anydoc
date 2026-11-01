@@ -6,13 +6,19 @@
       "name": "@bru02/anydoc",
       "dependencies": {
         "@firecrawl/anydoc-wasm": "0.2.4",
-        "@llamaindex/liteparse-wasm": "2.15.1",
+        "@llamaindex/liteparse-wasm": "2.17.0",
       },
+      "peerDependencies": {
+        "expo": ">=55",
+      },
+      "optionalPeers": [
+        "expo",
+      ],
     },
   },
   "packages": {
     "@firecrawl/anydoc-wasm": ["@firecrawl/anydoc-wasm@0.2.4", "", {}, "sha512-ZqrTXBrwi1Ct4kB5R72KQC9fOxwq4W08bZh6T+o84Mork3xCKLpH8TRe+KM3vJ+XqRVlV1dxHvQp0cnkO2r5TQ=="],
 
-    "@llamaindex/liteparse-wasm": ["@llamaindex/liteparse-wasm@2.15.1", "", {}, "sha512-EkBfl46oFTY22hUTOa+bqRFkFilnoB0mAxqF1zXcDNipkth4+adC40QJNmYQZ0aRiAviDLGN1j8wHszYyrxNMQ=="],
+    "@llamaindex/liteparse-wasm": ["@llamaindex/liteparse-wasm@2.17.0", "", {}, "sha512-BHZgev1NEiqr2jU1R6rbCqFJQoLdAlRvA5slEWKeOAhH9W2WFHeJENIU/g0smoS06qdDFs7uDrj6NGtJ+ae43g=="],
   }
 }

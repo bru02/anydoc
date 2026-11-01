@@ -1,21 +1,36 @@
 {
   "name": "@bru02/anydoc",
-  "version": "0.2.4-liteparse.1",
+  "version": "0.2.4-liteparse.2",
   "type": "module",
   "description": "AnyDoc document conversion with LiteParse PDF extraction",
   "license": "MIT",
   "repository": "github:bru02/anydoc",
   "scripts": {
-    "test": "node --test hybrid/*.test.js"
+    "test": "bun test ./expo && node --test hybrid/*.test.js",
+    "native:build:ios": "bun scripts/build-native.mjs ios",
+    "native:build:android": "bun scripts/build-native.mjs android"
   },
   "exports": {
     ".": {
       "types": "./hybrid/index.d.ts",
       "import": "./hybrid/index.js"
-    }
+    },
+    "./expo": {
+      "types": "./expo/index.d.ts",
+      "default": "./expo/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "dependencies": {
     "@firecrawl/anydoc-wasm": "0.2.4",
-    "@llamaindex/liteparse-wasm": "2.15.1"
+    "@llamaindex/liteparse-wasm": "2.17.0"
+  },
+  "peerDependencies": {
+    "expo": ">=55"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
   }
 }

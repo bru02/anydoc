@@ -1,5 +1,7 @@
 # anydoc
 
+Native Expo / React Native extraction is available through [`@bru02/anydoc/expo`](expo/README.md), with precompiled Rust/PDFium artifacts and direct file-path input.
+
 > **Fork note:** The root JavaScript package in this fork routes PDFs through
 > LiteParse WASM with OCR disabled, while retaining AnyDoc WASM for Office,
 > RTF, and the other document formats. It exposes the async

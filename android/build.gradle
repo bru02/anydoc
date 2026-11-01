@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.anydoc'
+version = '0.1.0'
+
+android {
+  namespace 'expo.modules.anydoc'
+  defaultConfig { minSdkVersion 24 }
+  sourceSets.main.jniLibs.srcDirs = ['src/main/jniLibs']
+}
+
+def prepareNative = tasks.register('prepareAnyDocNative', Exec) {
+  workingDir projectDir.parentFile
+  commandLine 'ruby', 'scripts/fetch-native.rb', 'android'
+  inputs.file file('../native/artifacts.json')
+  outputs.dir file('src/main/jniLibs')
+}
+tasks.named('preBuild').configure { dependsOn prepareNative }
