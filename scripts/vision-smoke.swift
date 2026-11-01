@@ -4,7 +4,11 @@ import Foundation
 
 @main
 enum VisionSmoke {
-  static func main() throws {
+  static func main() {
+    do { try run() }
+    catch { fputs("Vision smoke failed: \(error)\n", stderr); exit(1) }
+  }
+  static func run() throws {
     let width = 720, height = 240
     var rgba = [UInt8](repeating: 255, count: width * height * 4)
     rgba.withUnsafeMutableBytes { buffer in

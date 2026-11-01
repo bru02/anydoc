@@ -11,6 +11,7 @@ const result = await extractFile(file.uri, 'lecture.pdf', {
   maxBytes: 64 * 1024 * 1024,
   maxChars: 1_000_000,
   maxPages: 1000,
+  ocr: "accurate", // optional; defaults to "off"
 });
 if (result.status === 'ok') console.log(result.text, result.partial);
 ```
@@ -36,9 +37,9 @@ precompiled modules remain enabled; this package does not override that setting.
 - Office/RTF/EPUB/CSV use native AnyDoc 0.2.4. Its existing API accepts bytes,
   so it reads the input once into bounded native memory. ZIP/compound containers
   and PDFs require random access; neither is a forward-only byte stream.
-- OCR is disabled; there are no uploads or external conversion services.
+- OCR defaults to off. Set `ocr: "fast"` or `ocr: "accurate"` for native, on-device OCR of sparse/scanned PDF pages. iOS uses Apple Vision at the corresponding recognition level; fast renders at 144 DPI, accurate at 240 DPI. Android uses the bundled ML Kit Latin model at those render resolutions (ML Kit has no separate fast/accurate engine switch). OCR parses one page per batch and runs one recognition job at a time. No images enter JS and no document is uploaded; the Android model is included in the app, available offline on first use. Other scripts/models are not bundled.
 - A failed PDF page preserves other readable pages and marks the result partial.
-  Empty/image-only PDFs fail explicitly. Size/page/text caps are reported.
+  Empty/image-only PDFs fail explicitly when OCR is off. Size/page/text caps are reported.
 - `sourceChars` uses UTF-16 units, matching JS string length. It is omitted when
   a page or early text limit means the complete document length is unknown.
 - Batching can change Markdown grouping and running-header removal at batch
@@ -74,6 +75,6 @@ For source development, use `bun scripts/build-native.mjs host|ios|android`.
 Android source builds require Linux and `ANDROID_NDK_HOME`; iOS requires Xcode.
 These commands explicitly rebuild source and are not part of consumer builds.
 
-On-device latency, memory peaks, cancellation, OS background execution, OCR,
+On-device latency, memory peaks, cancellation, OS background execution,
 Android content-provider URIs, and remote URLs are not claimed by this API.
 Copy content-provider inputs to an app-owned native file before extraction.

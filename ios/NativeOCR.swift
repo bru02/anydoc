@@ -11,7 +11,7 @@ let nativeOcrRecognize: anydoc_ocr_recognize = { bytes, length, width, height, m
     do {
       response = try NativeOCR.recognize(bytes: bytes, length: length, width: width, height: height, mode: mode)
     } catch {
-      response = ["error": error.localizedDescription]
+      response = ["error": String(reflecting: error)]
     }
     guard let data = try? JSONSerialization.data(withJSONObject: response),
       let json = String(data: data, encoding: .utf8) else { return nil }
@@ -32,7 +32,7 @@ private enum NativeOCR {
         decode: nil, shouldInterpolate: false, intent: .defaultIntent) else {
       throw NSError(domain: "AnyDoc", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid native OCR image"])
     }
-    // Vision's accurate/Core ML path needs a supported 32-bit image format.
+    // Normalize the image to a conventional 32-bit format for Vision/Core ML.
     // CoreGraphics performs this conversion natively; no encoded PNG or JS copy.
     guard let context = CGContext(data: nil, width: Int(width), height: Int(height), bitsPerComponent: 8,
       bytesPerRow: Int(width) * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,

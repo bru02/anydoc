@@ -1,7 +1,7 @@
 use std::ffi::{CStr, c_char};
 use std::pin::Pin;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
 };
 
@@ -26,17 +26,27 @@ impl OcrConfig {
         }
         Ok(Self {
             mode,
-            engine: Some(Arc::new(TrackedEngine { inner: engine, failures: AtomicUsize::new(0) })),
+            engine: Some(Arc::new(TrackedEngine {
+                inner: engine,
+                failures: AtomicUsize::new(0),
+                last_error: Mutex::new(None),
+            })),
         })
     }
     pub fn failures(&self) -> usize {
         self.engine.as_ref().map_or(0, |engine| engine.failures.load(Ordering::Relaxed))
+    }
+    pub fn last_error(&self) -> Option<String> {
+        self.engine
+            .as_ref()
+            .and_then(|engine| engine.last_error.lock().unwrap_or_else(|e| e.into_inner()).clone())
     }
 }
 
 pub struct TrackedEngine {
     inner: Arc<dyn OcrEngine>,
     failures: AtomicUsize,
+    last_error: Mutex<Option<String>>,
 }
 impl OcrEngine for TrackedEngine {
     fn name(&self) -> &str {
@@ -51,8 +61,10 @@ impl OcrEngine for TrackedEngine {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<OcrResult>, OcrError>> + Send + '_>> {
         Box::pin(async move {
             let result = self.inner.recognize(data, width, height, options).await;
-            if result.is_err() {
+            if let Err(error) = &result {
                 self.failures.fetch_add(1, Ordering::Relaxed);
+                *self.last_error.lock().unwrap_or_else(|e| e.into_inner()) =
+                    Some(error.to_string());
             }
             result
         })

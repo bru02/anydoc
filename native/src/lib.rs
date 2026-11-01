@@ -176,6 +176,9 @@ fn extract_pdf(
     let enabled = ocr.engine.is_some();
     let parser = LiteParse::new(LiteParseConfig {
         ocr_enabled: enabled,
+        // Native OCR is best effort: never discard other readable pages when
+        // Vision/ML Kit is unavailable. The tracked errors mark partial output.
+        ocr_failure_fatal: false,
         dpi: if ocr.mode == 2 { 240.0 } else { 144.0 },
         num_workers: 1,
         output_format: OutputFormat::Markdown,
@@ -232,6 +235,12 @@ fn extract_pdf(
             details.push(format!("Parsed {last_page} of {total_pages} PDF pages"));
         }
         if output.text.trim().is_empty() {
+            if let Some(error) = ocr.last_error() {
+                return Ok(Extraction::failure(
+                    "extraction-failed",
+                    format!("Native OCR failed: {error}"),
+                ));
+            }
             return Ok(Extraction::failure(
                 "extraction-failed",
                 if enabled {
