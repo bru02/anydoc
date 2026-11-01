@@ -32,11 +32,11 @@ File.open(File.join(File.dirname(destination), '.anydoc-install.lock'), 'w') do 
     raise 'Cannot unpack AnyDoc native artifact' unless system('tar', '-xzf', archive, '-C', unpacked)
     source = platform == 'ios' ? unpacked : File.join(unpacked, 'jniLibs')
     FileUtils.rm_rf(destination)
-    FileUtils.cp_r(source, destination)
+    FileUtils.mv(source, destination)
     if platform == 'android'
       licenses = File.join(root, 'android/Licenses')
       FileUtils.rm_rf(licenses)
-      FileUtils.cp_r(File.join(unpacked, 'Licenses'), licenses)
+      FileUtils.mv(File.join(unpacked, 'Licenses'), licenses)
     end
     File.write(stamp, entry.fetch('sha256'))
   end
