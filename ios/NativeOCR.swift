@@ -47,6 +47,14 @@ private enum NativeOCR {
     request.recognitionLevel = mode == 1 ? .fast : .accurate
     request.usesLanguageCorrection = mode == 2
     request.automaticallyDetectsLanguage = true
+    #if os(macOS)
+    // Host contract checks use the CPU; iOS keeps Vision's device selection.
+    for (stage, devices) in request.supportedComputeStageDevices {
+      if let cpu = devices.first(where: { device in if case .cpu = device { return true }; return false }) {
+        request.setComputeDevice(cpu, for: stage)
+      }
+    }
+    #endif
     try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
     let tokens = try NSRegularExpression(pattern: "\\S+")
     var output: [[String: Any]] = []
