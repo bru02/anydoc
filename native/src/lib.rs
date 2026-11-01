@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use liteparse::stages::PdfInput;
+use liteparse::types::PdfInput;
 use liteparse::{LiteParse, LiteParseConfig, OutputFormat};
 use serde::Serialize;
 
