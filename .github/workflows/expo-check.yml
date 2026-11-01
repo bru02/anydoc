@@ -19,9 +19,9 @@ permissions:
 
 jobs:
   check:
-    runs-on: ${{ inputs.platform == 'ios' && 'macos-15' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.platform == 'ios' && 'macos-26' || 'ubuntu-24.04' }}
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       NATIVE_PLATFORM: ${{ inputs.platform }}
     steps:
       - uses: actions/checkout@v7

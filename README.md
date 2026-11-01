@@ -56,7 +56,7 @@ import { toDocument, toMarkdown, toMarkdownBytes } from '@firecrawl/anydoc';
 const markdown = await toMarkdown('report.docx');
 
 // To enable OCR:
-const markdown = await toMarkdown('report.docx', { ocr: 'hosted' );
+const markdown = await toMarkdown('report.docx', { ocr: 'hosted' });
 
 // From bytes, with the format detected from the content:
 const fromBytes = await toMarkdownBytes(bytes);

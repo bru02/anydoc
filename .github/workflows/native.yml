@@ -76,9 +76,9 @@ jobs:
   ios:
     if: github.event_name != 'workflow_dispatch' || inputs.platform != 'android'
     needs: [pdfium-ios, host]
-    runs-on: macos-15
+    runs-on: macos-26
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2

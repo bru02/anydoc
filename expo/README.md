@@ -23,6 +23,8 @@ artifacts on first installation; subsequent builds link them. No local Rust,
 Chromium/PDFium, or C++ parser compilation is required. The small Swift/Kotlin
 adapter builds against your app's installed Expo version. Expo SDK 58's own
 precompiled modules remain enabled; this package does not override that setting.
+The artifact installer uses Ruby and `tar`; Android-only development hosts need
+those tools as well. iOS/CocoaPods environments already require Ruby.
 
 ## Execution and memory
 
@@ -84,7 +86,7 @@ Simulator **compilation** is supported without launching a simulator.
 The separate `Expo adapter checks` workflow accepts a native prebuild run ID.
 Use it to validate Swift/Kotlin or Expo integration changes against existing
 parser artifacts without recompiling Rust or PDFium. The iOS jobs select Xcode
-26.3 explicitly; the runner's older default Swift compiler cannot build SDK 58.
+26.6 on macOS 26 explicitly; SDK 58 requires Xcode 26.4 or newer.
 
 For source development, use `bun scripts/build-native.mjs host|ios|android`.
 Android source builds require Linux and `ANDROID_NDK_HOME`; iOS requires Xcode.
