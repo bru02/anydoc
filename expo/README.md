@@ -17,14 +17,29 @@ const result = await extractFile(file.uri, 'lecture.pdf', {
 if (result.status === 'ok') console.log(result.text, result.partial);
 ```
 
-Install the pinned package revision, then run `bunx expo prebuild --no-clean`
-and build the app normally. CocoaPods and Gradle download checksum-pinned native
-artifacts on first installation; subsequent builds link them. No local Rust,
-Chromium/PDFium, or C++ parser compilation is required. The small Swift/Kotlin
-adapter builds against your app's installed Expo version. Expo SDK 58's own
-precompiled modules remain enabled; this package does not override that setting.
-The artifact installer uses Ruby and `tar`; Android-only development hosts need
-those tools as well. iOS/CocoaPods environments already require Ruby.
+The complete prebuilt package includes the Swift/Kotlin adapter and the parser:
+
+```sh
+bun add https://github.com/bru02/anydoc/releases/download/expo-v0.2.0/anydoc-expo-sdk58.tgz
+bunx expo prebuild --no-clean
+```
+
+It targets Expo **58.0.22**, ExpoModulesCore **58.0.29** and React Native
+**0.88.1**. Those exact versions are recorded in `prebuilds/profile.json` and
+checked before linking. iOS uses Debug/Release XCFrameworks with device and
+simulator slices; Android uses a bundled Maven repository containing the
+compiled AAR for all four ABIs. App builds link these artifacts without
+compiling the AnyDoc Swift/Kotlin, Rust or PDFium sources. The final iOS app
+still needs a Mac with Xcode to compile and link.
+
+For a different SDK or when modifying the adapter, install a pinned source
+revision instead, or opt out through `expo.autolinking.ios.buildFromSource`
+with `"@bru02/anydoc"` and `expo.autolinking.android.buildFromSource` with
+`"bru02-anydoc"`. The source adapter downloads SHA-verified Rust/PDFium core
+artifacts; it still does not require local Rust or Chromium compilation. That
+installer requires Ruby and `tar`, including on Android-only hosts. Native
+compilation options are fixed in a prebuilt binary; rebuild it or use the source
+adapter when changing them. OCR quality remains a runtime option.
 
 ## Execution and memory
 
@@ -68,6 +83,30 @@ autolinking and threading integrated with Expo without another codegen layer.
 
 ## Prebuilt artifacts and CI
 
+`.github/workflows/prebuilt-module.yml` builds the **complete module**, then
+installs the resulting package in fresh Expo apps. Consumer checks remove the
+AnyDoc Swift/Kotlin sources and verify that CocoaPods/Gradle select the binary
+module before compiling iOS device Release, iOS simulator Debug and Android
+Release apps. No simulator or emulator is started. Publication runs only after
+both consumer checks pass.
+
+The iOS producer uses Expo's upstream `runPrebuildPackagesAsync` pipeline,
+pinned to commit `e5514fbaca95d4467cfa0c4195c1b8af870a7180`. It performs SPM
+generation, compilation, XCFramework composition and Swift interface checks.
+Expo keeps this producer inside its monorepo rather than a standalone public
+CLI; CI compiles its producer tools and supplies the actual SDK dependencies.
+Android uses SDK 58's `publishReleasePublicationToNPMPackageRepository` Gradle
+task and its normal autolinking publication metadata. References:
+[Expo's iOS CI](https://github.com/expo/expo/blob/e5514fbaca95d4467cfa0c4195c1b8af870a7180/.github/workflows/ios-prebuild-external-xcframeworks.yml),
+[Android CI](https://github.com/expo/expo/blob/e5514fbaca95d4467cfa0c4195c1b8af870a7180/.github/workflows/changesets-precompile-android.yml),
+[producer documentation](https://github.com/expo/expo/tree/e5514fbaca95d4467cfa0c4195c1b8af870a7180/tools/src/prebuilds).
+
+Producing the iOS module requires a **macOS runner with Xcode**. Producing its
+simulator slices only cross-compiles code; it does not require a running
+simulator. Android production runs on Linux. Released core artifacts are reused
+when rebuilding the adapter, so neither platform rebuilds Rust/PDFium for an
+adapter-only change.
+
 `.github/workflows/native.yml` runs host parser tests against the pinned LiteParse
 PDFium fork, then cross-compiles:
 
@@ -80,7 +119,13 @@ PDFium fork, then cross-compiles:
 It never boots a simulator or emulator. Push a new `native-v*` tag to publish
 the artifacts; commit their SHA-256 values to `native/artifacts.json` before
 consumers adopt that package revision. Tags/assets must not be overwritten.
-PDFium mobile binaries are built from the same pinned LiteParse fork as the desktop engine, with build/source revisions in `native/pdfium.json`. Desktop host-test inputs are pinned by SHA-256. Stock PDFium does not export the fork APIs required by LiteParse and must not be substituted.
+PDFium mobile binaries use the same patched build as LiteParse's desktop engine:
+Chromium base `a5a7089234f121990b336b3841008009dca143bf` on `chromium/8058`,
+with run-llama's LlamaParse patch set applied by
+[`steps/03-patch.sh`](https://github.com/run-llama/pdfium-binaries/blob/f15f55200f695a13c2ca3aab35f8aa40a596b2f7/steps/03-patch.sh).
+The build/source revisions are in `native/pdfium.json`; host-test inputs are
+pinned by SHA-256. Stock PDFium lacks required fork exports and must not be
+substituted.
 Simulator **compilation** is supported without launching a simulator.
 
 The separate `Expo adapter checks` workflow accepts a native prebuild run ID.

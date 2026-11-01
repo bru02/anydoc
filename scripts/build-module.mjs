@@ -14,7 +14,7 @@ if (platform === "android") {
   // The publication task comes from Expo's SDK 58 Gradle plugin. The AAR
   // includes the Kotlin adapter, JNI libraries, consumer rules and ML Kit POM.
   const repository = path.join(output, "local-maven-repo");
-  run("./gradlew", [":bru02-anydoc:publishReleasePublicationToNPMPackageRepository", `-Pexpo.precompileAndroid.repository=${repository}`, "-x", "prepareAnyDocNative", "--no-daemon"], path.join(directory, "android"));
+  run("./gradlew", [":bru02-anydoc:publishReleasePublicationToNPMPackageRepository", `-Pexpo.precompileAndroid.repository=${repository}`, "-x", "prepareAnyDocNative", "--no-daemon"], path.join(directory, "android"), { ANYDOC_BUILD_MODULE: "1" });
   const aar = path.join(repository, "app/anydoc/expo.modules.anydoc/0.2.0/expo.modules.anydoc-0.2.0.aar");
   if (!existsSync(aar)) throw new Error("Publication did not produce the module AAR");
   const members = run("unzip", ["-Z1", aar], root, {}, true);
@@ -26,7 +26,7 @@ if (platform === "android") {
   if (!pom.includes("text-recognition")) throw new Error("Publication dropped the OCR runtime dependency");
 } else {
   // Run Expo's pinned, unmodified prebuild pipeline, including composition and
-  // Swift interface verification. Its TypeScript entry runs under Bun; no
+  // Swift interface verification. Its compiled tools run under Bun; no
   // private Expo release service or monorepo-wide build is needed.
   run("bun", [path.join(root, "scripts/upstream-prebuild.mjs"), directory, pkg], root);
   const built = path.join(root, ".ci/expo/packages/anydoc/.expo-prebuild/output");

@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": "github:bru02/anydoc",
   "scripts": {
-    "test": "bun test ./expo && node --test hybrid/*.test.js",
+    "test": "bun test ./expo scripts/prebuilt-profile.test.ts && node --test hybrid/*.test.js",
     "native:build:ios": "bun scripts/build-native.mjs ios",
     "native:build:android": "bun scripts/build-native.mjs android",
     "module:build:ios": "bun scripts/build-module.mjs ios",

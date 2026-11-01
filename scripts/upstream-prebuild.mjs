@@ -14,12 +14,14 @@ const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 for (const [name, version] of Object.entries(manifest.dependencies)) {
   if (version.startsWith("workspace:")) manifest.dependencies[name] = requireApp(`${name}/package.json`).version;
 }
-// Only install the producer's runtime dependencies. Published workspace tools
-// supply their compiled entrypoints, while Bun executes the upstream TS files.
-delete manifest.devDependencies;
+// Published workspace tools supply their compiled entrypoints. Compile the
+// producer as CommonJS like upstream: some legacy imports are type-only and
+// cannot be executed directly as ESM by a TypeScript runtime.
+manifest.devDependencies = { typescript: "6.0.3", "@types/node": "22.14.0" };
 delete manifest.scripts;
 await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 run("bun", ["install", "--ignore-scripts"], tools);
+run("bun", ["x", "tsc", "--project", "tsconfig.json", "--noCheck"], tools);
 
 const destination = path.join(expo, "packages/anydoc");
 await mkdir(destination, { recursive: true });
@@ -39,6 +41,7 @@ for (const name of ["expo-modules-core", "expo-modules-jsi"]) {
   const target = path.join(expo, "packages", name);
   await rm(target, { recursive: true, force: true });
   await cp(source, target, { recursive: true });
+  await rm(path.join(target, "node_modules"), { recursive: true, force: true });
   await symlink(path.join(app, "node_modules"), path.join(target, "node_modules"), "dir");
 }
 for (const flavor of ["debug", "release"]) {
@@ -49,9 +52,9 @@ for (const flavor of ["debug", "release"]) {
 }
 const rn = path.dirname(requireApp.resolve("react-native/package.json"));
 const properties = await readFile(path.join(rn, "sdks/hermes-engine/version.properties"), "utf8");
-const { resolveHermesVersion } = await import(pathToFileURL(path.join(tools, "src/prebuilds/Utils.ts")));
-const { ensureSupportedToolchainAsync } = await import(pathToFileURL(path.join(tools, "src/prebuilds/Toolchain.ts")));
-const { runPrebuildPackagesAsync } = await import(pathToFileURL(path.join(tools, "src/commands/PrebuildPackages.ts")));
+const { resolveHermesVersion } = await import(pathToFileURL(path.join(tools, "build/prebuilds/Utils.js")));
+const { ensureSupportedToolchainAsync } = await import(pathToFileURL(path.join(tools, "build/prebuilds/Toolchain.js")));
+const { runPrebuildPackagesAsync } = await import(pathToFileURL(path.join(tools, "build/commands/PrebuildPackages.js")));
 await ensureSupportedToolchainAsync();
 const options = {
   reactNativeVersion: requireApp("react-native/package.json").version,
