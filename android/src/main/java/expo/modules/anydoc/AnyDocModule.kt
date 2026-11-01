@@ -4,12 +4,15 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import android.graphics.Bitmap
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
+import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,11 +34,14 @@ class AnyDocModule : Module() {
     ): String
 
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    @Volatile private var pendingRecognition: Task<Text>? = null
 
     // Called synchronously through JNI from the native parser worker. Rust owns
     // the direct RGB buffer until return; only the Bitmap is retained by ML Kit.
     @JvmStatic private fun recognizeNative(rgb: ByteBuffer, width: Int, height: Int): String {
       return try {
+        // A timeout cannot cancel ML Kit. Do not queue more images behind it.
+        check(pendingRecognition?.isComplete != false) { "The previous OCR request is still running" }
         require(width > 0 && height > 0 && width.toLong() * height * 3 == rgb.capacity().toLong())
         val pixels = IntArray(width * height)
         for (index in pixels.indices) {
@@ -45,7 +51,24 @@ class AnyDocModule : Module() {
           pixels[index] = (255 shl 24) or (r shl 16) or (g shl 8) or b
         }
         val bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
-        val result = Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap, 0)), 60, TimeUnit.SECONDS)
+        val task = try {
+          recognizer.process(InputImage.fromBitmap(bitmap, 0))
+        } catch (error: Exception) {
+          bitmap.recycle()
+          throw error
+        }
+        pendingRecognition = task
+        val result = try {
+          Tasks.await(task, 60, TimeUnit.SECONDS)
+        } finally {
+          if (task.isComplete) {
+            pendingRecognition = null
+            bitmap.recycle()
+          } else {
+            // Keep timed-out input alive until the recognizer actually finishes.
+            task.addOnCompleteListener(Executor { it.run() }) { bitmap.recycle() }
+          }
+        }
         val words = JSONArray()
         for (block in result.textBlocks) for (line in block.lines) for (element in line.elements) {
           val box = element.boundingBox ?: continue
