@@ -76,7 +76,7 @@ async function notices(vendor, destination) {
   await cp("LICENSE", path.join(destination, "AnyDoc-LICENSE"));
   await writeFile(path.join(destination, "LiteParse-LICENSE.txt"), "LiteParse is licensed under Apache-2.0.\nhttps://github.com/run-llama/liteparse/blob/wasm-v2.17.0/LICENSE\n");
   // Complete transitive Rust notices are generated from the locked dependency graph.
-  run("cargo", ["about", "generate", "-m", "native/Cargo.toml", "scripts/licenses.hbs", "-o", path.join(destination, "rust-licenses.html")]);
+  run("cargo", ["about", "generate", "--locked", "--all-features", "--fail", "-m", "native/Cargo.toml", "scripts/licenses.hbs", "-o", path.join(destination, "rust-licenses.html")]);
 }
 
 await mkdir(output, { recursive: true });
