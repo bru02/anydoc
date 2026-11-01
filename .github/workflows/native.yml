@@ -88,7 +88,7 @@ jobs:
         with:
           key: anydoc-ios
           cache-on-failure: true
-      - run: cargo install cargo-about --locked
+      - run: cargo install cargo-about --version 0.9.3 --features cli --locked
       - run: bun install --frozen-lockfile
       - run: bun run test
       - run: cargo fmt --all --check
@@ -125,7 +125,7 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'ndk;27.1.12297006'
-      - run: cargo install cargo-about --locked
+      - run: cargo install cargo-about --version 0.9.3 --features cli --locked
       - uses: actions/download-artifact@v7
         with:
           pattern: pdfium-android-*
@@ -161,4 +161,4 @@ jobs:
         run: |
           cd artifacts
           sha256sum anydoc-*.tar.gz > SHA256SUMS
-          gh release create "$RELEASE_TAG" anydoc-*.tar.gz SHA256SUMS --verify-tag --title "$RELEASE_TAG" --notes 'Precompiled AnyDoc Rust core, LiteParse 2.17.0 and its PDFium fork at chromium/8058. iOS device/simulator and four Android ABIs. Source paths only cross the JS bridge; OCR is disabled.'
+          gh release create "$RELEASE_TAG" anydoc-*.tar.gz SHA256SUMS --verify-tag --title "$RELEASE_TAG" --notes 'Precompiled AnyDoc Rust core, LiteParse 2.17.0 and its PDFium fork at chromium/8058. iOS device/simulator and four Android ABIs. Source paths only cross the JS bridge; optional native Apple Vision and ML Kit OCR support fast/accurate modes.'
