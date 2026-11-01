@@ -1,6 +1,6 @@
 {
   "name": "@bru02/anydoc",
-  "version": "0.2.4-liteparse.2",
+  "version": "0.2.4-liteparse.3",
   "type": "module",
   "description": "AnyDoc document conversion with LiteParse PDF extraction",
   "license": "MIT",
@@ -8,7 +8,9 @@
   "scripts": {
     "test": "bun test ./expo && node --test hybrid/*.test.js",
     "native:build:ios": "bun scripts/build-native.mjs ios",
-    "native:build:android": "bun scripts/build-native.mjs android"
+    "native:build:android": "bun scripts/build-native.mjs android",
+    "module:build:ios": "bun scripts/build-module.mjs ios",
+    "module:build:android": "bun scripts/build-module.mjs android"
   },
   "exports": {
     ".": {
@@ -32,5 +34,27 @@
     "expo": {
       "optional": true
     }
-  }
+  },
+  "files": [
+    "hybrid/*.js",
+    "hybrid/*.d.ts",
+    "expo/*.js",
+    "expo/*.d.ts",
+    "expo/README.md",
+    "expo-module.config.json",
+    "spm.config.json",
+    "ios/*.swift",
+    "ios/*.podspec",
+    "android/build.gradle",
+    "android/should-use-publication.gradle",
+    "android/consumer-rules.pro",
+    "android/src/main/java",
+    "android/src/main/AndroidManifest.xml",
+    "native/artifacts.json",
+    "scripts/fetch-native.rb",
+    "scripts/prebuilt-profile.mjs",
+    "prebuilds",
+    "local-maven-repo",
+    "LICENSE"
+  ]
 }

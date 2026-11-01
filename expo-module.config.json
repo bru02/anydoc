@@ -1,5 +1,14 @@
 {
   "platforms": ["apple", "android"],
   "apple": { "modules": ["AnyDocModule"] },
-  "android": { "modules": ["expo.modules.anydoc.AnyDocModule"] }
+  "android": {
+    "modules": ["expo.modules.anydoc.AnyDocModule"],
+    "shouldUsePublicationScriptPath": "android/should-use-publication.gradle",
+    "publication": {
+      "groupId": "app.anydoc",
+      "artifactId": "expo.modules.anydoc",
+      "version": "0.2.0",
+      "repository": "local-maven-repo"
+    }
+  }
 }

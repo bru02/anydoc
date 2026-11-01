@@ -25,3 +25,7 @@ __pycache__/
 /android/src/main/.anydoc-install.lock
 /android/Licenses/
 /native/expo-check/
+prebuilds/
+local-maven-repo/
+/native/module-*/
+/.ci/

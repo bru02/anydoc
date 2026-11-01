@@ -1,0 +1,18 @@
+{
+  "publishPrebuilds": true,
+  "products": [{
+    "name": "AnyDoc",
+    "podName": "AnyDoc",
+    "platforms": ["iOS(\"17.0\")"],
+    "externalDependencies": ["ReactNativeDependencies", "React", "Hermes", "expo-modules-core/ExpoModulesCore"],
+    "targets": [
+      {"type": "framework", "name": "AnyDocCore", "path": "ios/Frameworks/AnyDocCore.xcframework"},
+      {
+        "type": "swift", "name": "AnyDoc", "path": "ios", "pattern": "*.swift",
+        "dependencies": ["AnyDocCore", "ReactNativeDependencies", "React", "Hermes", "expo-modules-core/ExpoModulesCore"],
+        "linkedFrameworks": ["Foundation", "Vision", "CoreGraphics", "Security", "SystemConfiguration"],
+        "linkerFlags": ["-lc++", "-liconv", "-lresolv"]
+      }
+    ]
+  }]
+}
