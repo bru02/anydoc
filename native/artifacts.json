@@ -1,5 +1,13 @@
 {
   "tag": "native-v0.1.0",
-  "ios": null,
-  "android": null
+  "ios": {
+    "sha256": "577b111ceecf5890d09ef0646f056dde146e6229f92a4acdfa9f176143f4cbd1",
+    "sourceCommit": "3ed5dabdf91d8cec43843e057b3727422bc61ae3",
+    "buildRun": 41276450916
+  },
+  "android": {
+    "sha256": "c68451c5fd58d643512ac13057a58dcebe02ab47e155a1049882c60d288c0574",
+    "sourceCommit": "d1c3754ac08372dc2a14d7f81954f2b0f2ee948d",
+    "buildRun": 41274517700
+  }
 }
