@@ -146,4 +146,5 @@ jobs:
       - name: Publish the validated package
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create expo-v0.2.0 native/module-dist/anydoc-expo-sdk58.tgz native/module-dist/SHA256SUMS --target "$GITHUB_SHA" --title 'Complete Expo SDK 58 module' --notes 'Precompiled Swift and Kotlin adapters, Rust parser and patched PDFium. SDK profile: Expo 58.0.22, expo-modules-core 58.0.29, React Native 0.88.1. iOS Debug/Release device and simulator slices; Android all four ABIs. Consumer apps verified without AnyDoc adapter sources. No simulator or emulator boot required.'
+        run: |
+          gh release create expo-v0.2.0 native/module-dist/anydoc-expo-sdk58.tgz native/module-dist/SHA256SUMS --target "$GITHUB_SHA" --title 'Complete Expo SDK 58 module' --notes 'Precompiled Swift and Kotlin adapters, Rust parser and patched PDFium. SDK profile: Expo 58.0.22, expo-modules-core 58.0.29, React Native 0.88.1. iOS Debug/Release device and simulator slices; Android all four ABIs. Consumer apps verified without AnyDoc adapter sources. No simulator or emulator boot required.'
