@@ -1,15 +1,10 @@
 {
-  "repository": "bblanchon/pdfium-binaries",
-  "tag": "chromium/8125",
+  "repository": "run-llama/pdfium-binaries",
+  "tag": "chromium/8058",
+  "buildCommit": "f15f55200f695a13c2ca3aab35f8aa40a596b2f7",
+  "sourceCommit": "a5a7089234f121990b336b3841008009dca143bf",
   "assets": {
-    "pdfium-mac-arm64": "4939bd935ac83ddc09a3a4f038bc43a19cea1660316a3667f26cb07a070e139d",
-    "pdfium-mac-x64": "8a5193535b80c7215d8932f6647ae5097465b6dba2811602c21e120c2af112b0",
-    "pdfium-ios-device-arm64": "a9ab2295c65005d6fe81b11a172645160a5194ae55d1ffdf8444dd27124aad23",
-    "pdfium-ios-simulator-arm64": "b2b5f0c918f661b9fe8de7dba3d3fee7d7df61db3247cfb0f3f910077af54f1b",
-    "pdfium-ios-simulator-x64": "9ecdaf60af15bd51ace0c00ca829cec764307d3963a9c0764f9e803464ee217a",
-    "pdfium-android-arm64": "0495e57163429937caaee1bdd9b07924a7098dbd51d1b97645d124e349f097b4",
-    "pdfium-android-arm": "ac4ac5319ded88ba5d885747a6b2641e7f712c9797de0770465104abe4dbf7da",
-    "pdfium-android-x64": "bd68707f29f2316c20f9d5c793b8731796a4a65408ac4d3c30bc606390354e41",
-    "pdfium-android-x86": "9d4f7edf5b46e1ab155d9da3e56520f2554900997c74e21951f524ea7928c622"
+    "pdfium-mac-arm64": "df8d1016fc36c2651b368ca13b992ae3bb6b6020d12f2d24443bf13cf76ea593",
+    "pdfium-mac-x64": "f472eb06b4f556abae749a9fac8aff7da394348096c0d0c9fe45fd50639b98ce"
   }
 }

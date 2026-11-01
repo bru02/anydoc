@@ -15,7 +15,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  pdfium-ios:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cpu: arm64
+            environment: device
+          - cpu: arm64
+            environment: simulator
+          - cpu: x64
+            environment: simulator
+    uses: ./.github/workflows/pdfium.yml
+    with:
+      os: ios
+      cpu: ${{ matrix.cpu }}
+      environment: ${{ matrix.environment }}
+
+  pdfium-android:
+    strategy:
+      fail-fast: false
+      matrix:
+        cpu: [arm64, arm, x64, x86]
+    uses: ./.github/workflows/pdfium.yml
+    with:
+      os: android
+      cpu: ${{ matrix.cpu }}
+
   ios:
+    needs: pdfium-ios
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
@@ -31,10 +59,16 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run test
       - run: cargo fmt --all --check
-      - name: Native host tests against pinned stock PDFium
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: pdfium-ios-*
+          path: native/vendor
+      - name: Native host tests against the pinned LiteParse PDFium fork
         run: bun scripts/build-native.mjs host
       - name: Cross-compile device and simulator libraries (never boot a simulator)
         run: bun scripts/build-native.mjs ios
+        env:
+          ANYDOC_PDFIUM_FROM_CI: '1'
       - name: Compile the Swift Expo adapter against SDK 58 (device build only)
         run: bun scripts/check-expo.mjs ios
       - uses: actions/upload-artifact@v6
@@ -45,6 +79,7 @@ jobs:
           retention-days: 14
 
   android:
+    needs: pdfium-android
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -59,8 +94,12 @@ jobs:
           packages: platform-tools
       - run: sdkmanager 'ndk;27.1.12297006'
       - run: cargo install cargo-about --locked
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: pdfium-android-*
+          path: native/vendor
       - name: Prebuild JNI and PDFium for all four Android ABIs
-        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.1.12297006" bun scripts/build-native.mjs android
+        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.1.12297006" ANYDOC_PDFIUM_FROM_CI=1 bun scripts/build-native.mjs android
       - name: Compile the Kotlin Expo adapter against SDK 58 (no emulator)
         run: bun scripts/check-expo.mjs android
       - uses: actions/upload-artifact@v6
@@ -90,4 +129,4 @@ jobs:
         run: |
           cd artifacts
           sha256sum anydoc-*.tar.gz > SHA256SUMS
-          gh release create "$RELEASE_TAG" anydoc-*.tar.gz SHA256SUMS --verify-tag --title "$RELEASE_TAG" --notes 'Precompiled AnyDoc Rust core, LiteParse 2.17.0 and PDFium chromium/8125. iOS device/simulator and four Android ABIs. Source paths only cross the JS bridge; OCR is disabled.'
+          gh release create "$RELEASE_TAG" anydoc-*.tar.gz SHA256SUMS --verify-tag --title "$RELEASE_TAG" --notes 'Precompiled AnyDoc Rust core, LiteParse 2.17.0 and its PDFium fork at chromium/8058. iOS device/simulator and four Android ABIs. Source paths only cross the JS bridge; OCR is disabled.'

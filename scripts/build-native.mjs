@@ -16,6 +16,14 @@ function run(command, args, env = {}) {
 
 async function download(asset) {
   const directory = path.join(root, "native/vendor", asset);
+  if (process.env.ANYDOC_PDFIUM_FROM_CI === "1" && !asset.startsWith("pdfium-mac-")) {
+    const source = JSON.parse(await readFile(path.join(directory, "anydoc-source.json"), "utf8"));
+    if (source.buildCommit !== pdfium.buildCommit || source.branch !== pdfium.tag) {
+      throw new Error(`Unexpected PDFium build provenance: ${asset}`);
+    }
+    return directory;
+  }
+  if (!pdfium.assets[asset]) throw new Error(`${asset} must be built by the matching PDFium mobile workflow`);
   await mkdir(directory, { recursive: true });
   const archive = `${directory}.tgz`;
   const response = await fetch(`https://github.com/${pdfium.repository}/releases/download/${pdfium.tag}/${asset}.tgz`);
@@ -25,6 +33,24 @@ async function download(asset) {
   await writeFile(archive, bytes);
   run("tar", ["-xzf", archive, "-C", directory]);
   return directory;
+}
+
+async function framework(vendor, destination, simulator) {
+  await mkdir(destination, { recursive: true });
+  await cp(path.join(vendor, "lib/libpdfium.dylib"), path.join(destination, "pdfium"));
+  run("install_name_tool", ["-id", "@rpath/pdfium.framework/pdfium", path.join(destination, "pdfium")]);
+  await writeFile(path.join(destination, "Info.plist"), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>pdfium</string>
+<key>CFBundleIdentifier</key><string>app.anydoc.pdfium</string>
+<key>CFBundleName</key><string>pdfium</string>
+<key>CFBundlePackageType</key><string>FMWK</string>
+<key>CFBundleShortVersionString</key><string>158.0.8058</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>MinimumOSVersion</key><string>17.0</string>
+<key>CFBundleSupportedPlatforms</key><array><string>${simulator ? "iPhoneSimulator" : "iPhoneOS"}</string></array>
+</dict></plist>\n`);
 }
 
 async function build(target, asset, options = {}) {
@@ -70,9 +96,12 @@ if (platform === "host") {
   await writeFile("native/include/module.modulemap", 'module AnyDocCore { header "anydoc_mobile.h" export * }\n');
   run("xcodebuild", ["-create-xcframework", "-library", path.join(root, "target/aarch64-apple-ios/release/libanydoc_mobile.a"), "-headers", path.join(root, "native/include"), "-library", path.join(destination, "libanydoc_sim.a"), "-headers", path.join(root, "native/include"), "-output", path.join(destination, "AnyDocCore.xcframework")]);
   const simFramework = path.join(destination, "sim/pdfium.framework");
-  await cp(path.join(sim, "lib/pdfium.framework"), simFramework, { recursive: true });
-  run("lipo", ["-create", path.join(sim, "lib/pdfium.framework/pdfium"), path.join(simX64, "lib/pdfium.framework/pdfium"), "-output", path.join(simFramework, "pdfium")]);
-  run("xcodebuild", ["-create-xcframework", "-framework", path.join(device, "lib/pdfium.framework"), "-framework", simFramework, "-output", path.join(destination, "pdfium.xcframework")]);
+  const deviceFramework = path.join(destination, "device/pdfium.framework");
+  await framework(sim, simFramework, true);
+  await framework(device, deviceFramework, false);
+  run("lipo", ["-create", path.join(sim, "lib/libpdfium.dylib"), path.join(simX64, "lib/libpdfium.dylib"), "-output", path.join(simFramework, "pdfium")]);
+  run("install_name_tool", ["-id", "@rpath/pdfium.framework/pdfium", path.join(simFramework, "pdfium")]);
+  run("xcodebuild", ["-create-xcframework", "-framework", deviceFramework, "-framework", simFramework, "-output", path.join(destination, "pdfium.xcframework")]);
   await notices(device, path.join(destination, "Licenses"));
   run("tar", ["-czf", path.join(output, "anydoc-ios.tar.gz"), "-C", destination, "AnyDocCore.xcframework", "pdfium.xcframework", "Licenses"]);
 } else if (platform === "android") {

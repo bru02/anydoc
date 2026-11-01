@@ -1,0 +1,88 @@
+name: PDFium mobile binary
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        type: string
+        required: true
+      cpu:
+        type: string
+        required: true
+      environment:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ inputs.os == 'ios' && 'macos-15' || 'ubuntu-24.04' }}
+    timeout-minutes: 60
+    env:
+      PDFium_BRANCH: chromium/8058
+      PDFium_VERSION: 158.0.8058.0
+      PDFium_TARGET_OS: ${{ inputs.os }}
+      PDFium_TARGET_CPU: ${{ inputs.cpu }}
+      PDFium_TARGET_ENVIRONMENT: ${{ inputs.environment }}
+      PDFium_ENABLE_V8: 'false'
+      PDFium_IS_DEBUG: 'false'
+    defaults:
+      run:
+        working-directory: pdfium-build
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: run-llama/pdfium-binaries
+          ref: f15f55200f695a13c2ca3aab35f8aa40a596b2f7
+          path: pdfium-build
+      - name: Cache the matching mobile PDFium binary
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: pdfium-build/staging
+          key: pdfium-f15f552-8058-${{ inputs.os }}-${{ inputs.environment }}-${{ inputs.cpu }}
+      - name: Install depot_tools
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git depot_tools
+          echo "$PWD/depot_tools" >> "$GITHUB_PATH"
+          steps/00-environment.sh
+      - name: Check out pinned PDFium source
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          steps/02-checkout.sh
+          test "$(git -C pdfium rev-parse HEAD)" = a5a7089234f121990b336b3841008009dca143bf
+        timeout-minutes: 20
+      - name: Apply the LiteParse fork and platform patches
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: steps/03-patch.sh
+      - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: steps/04-install-extras.sh
+      - name: Configure
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: steps/05-configure.sh
+      - name: Compile PDFium (no simulator or emulator execution)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: steps/06-build.sh
+      - name: Stage binary and licenses
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          steps/07-stage.sh
+          steps/08-licenses.sh
+          printf '%s\n' '{"buildRepository":"run-llama/pdfium-binaries","buildCommit":"f15f55200f695a13c2ca3aab35f8aa40a596b2f7","branch":"chromium/8058"}' > staging/anydoc-source.json
+      - name: Name the artifact
+        id: name
+        run: |
+          name="pdfium-$PDFium_TARGET_OS"
+          [ -z "$PDFium_TARGET_ENVIRONMENT" ] || name="$name-$PDFium_TARGET_ENVIRONMENT"
+          echo "value=$name-$PDFium_TARGET_CPU" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.name.outputs.value }}
+          path: pdfium-build/staging
+          if-no-files-found: error
+          retention-days: 14

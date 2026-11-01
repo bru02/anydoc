@@ -55,8 +55,8 @@ autolinking and threading integrated with Expo without another codegen layer.
 
 ## Prebuilt artifacts and CI
 
-`.github/workflows/native.yml` runs host parser tests against the pinned stock
-PDFium, then cross-compiles:
+`.github/workflows/native.yml` runs host parser tests against the pinned LiteParse
+PDFium fork, then cross-compiles:
 
 - iOS arm64 device + arm64/x86_64 simulator slices in `AnyDocCore.xcframework`
   and a separate embedded `pdfium.xcframework`;
@@ -67,7 +67,7 @@ PDFium, then cross-compiles:
 It never boots a simulator or emulator. Push a new `native-v*` tag to publish
 the artifacts; commit their SHA-256 values to `native/artifacts.json` before
 consumers adopt that package revision. Tags/assets must not be overwritten.
-PDFium inputs are independently pinned by SHA-256 in `native/pdfium.json`.
+PDFium mobile binaries are built from the same pinned LiteParse fork as the desktop engine, with build/source revisions in `native/pdfium.json`. Desktop host-test inputs are pinned by SHA-256. Stock PDFium does not export the fork APIs required by LiteParse and must not be substituted.
 Simulator **compilation** is supported without launching a simulator.
 
 For source development, use `bun scripts/build-native.mjs host|ios|android`.
