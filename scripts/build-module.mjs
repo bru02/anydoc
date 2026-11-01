@@ -33,13 +33,13 @@ if (platform === "android") {
   for (const flavor of ["debug", "release"]) {
     const frameworks = path.join(built, flavor, "xcframeworks");
     if (!existsSync(path.join(frameworks, "AnyDoc.xcframework"))) throw new Error(`Missing ${flavor} module`);
-    for (const name of ["AnyDocCore.xcframework", "pdfium.xcframework", "Licenses"]) {
+    for (const name of ["pdfium.xcframework", "Licenses"]) {
       await cp(path.join(pkg, "ios/Frameworks", name), path.join(frameworks, name), { recursive: true });
     }
     await cp(path.join(root, "LICENSE"), path.join(frameworks, "LICENSE"));
     const archives = path.join(output, "prebuilds/output", flavor, "xcframeworks");
     await mkdir(archives, { recursive: true });
-    run("tar", ["-czf", path.join(archives, "AnyDoc.tar.gz"), "-C", frameworks, "AnyDoc.xcframework", "AnyDocCore.xcframework", "pdfium.xcframework", "Licenses", "LICENSE"], root);
+    run("tar", ["-czf", path.join(archives, "AnyDoc.tar.gz"), "-C", frameworks, "AnyDoc.xcframework", "pdfium.xcframework", "Licenses", "LICENSE"], root);
   }
 }
 run("tar", ["-czf", path.join(root, `native/module-dist/full-${platform}.tar.gz`), "-C", output, ...(await readdir(output))], root);

@@ -28,7 +28,7 @@ Pod::Spec.new do |s|
   s.static_framework = true
   s.dependency 'ExpoModulesCore'
   if precompiled && Expo::PrecompiledModules.try_link_with_prebuilt_xcframework(s)
-    s.vendored_frameworks = ['AnyDoc.xcframework', 'AnyDocCore.xcframework', 'pdfium.xcframework']
+    s.vendored_frameworks = ['AnyDoc.xcframework', 'pdfium.xcframework']
     s.license = { :type => 'MIT', :file => 'LICENSE' }
     s.preserve_paths = ['Licenses/**/*', 'artifacts/**/*']
   else

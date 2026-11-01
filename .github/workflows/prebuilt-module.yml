@@ -12,7 +12,7 @@ on:
         type: string
         default: ''
       package_run:
-        description: Optional run ID with an assembled sdk58-package to recheck without rebuilding
+        description: Reuse binaries from sdk58-package and package the current JS/metadata
         type: string
         default: ''
 
@@ -110,12 +110,18 @@ jobs:
           name: sdk58-package
           run-id: ${{ inputs.package_run }}
           github-token: ${{ github.token }}
-          path: native/module-dist
+          path: native/module-dist/reused
       - name: Assemble the installable package
-        if: inputs.package_run == ''
+        env:
+          PACKAGE_RUN: ${{ inputs.package_run }}
         run: |
-          tar -xzf native/module-dist/full-ios.tar.gz
-          tar -xzf native/module-dist/full-android.tar.gz
+          if [ -n "$PACKAGE_RUN" ]; then
+            tar -xzf native/module-dist/reused/anydoc-expo-sdk58.tgz --strip-components=1 package/prebuilds package/local-maven-repo
+          else
+            tar -xzf native/module-dist/full-ios.tar.gz
+            tar -xzf native/module-dist/full-android.tar.gz
+          fi
+          bun scripts/package-module.mjs
           bun pm pack --filename native/module-dist/anydoc-expo-sdk58.tgz --ignore-scripts
           shasum -a 256 native/module-dist/anydoc-expo-sdk58.tgz > native/module-dist/SHA256SUMS
       - uses: actions/upload-artifact@v7
