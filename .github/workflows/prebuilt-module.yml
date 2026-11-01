@@ -128,6 +128,7 @@ jobs:
 
   consume:
     needs: package
+    if: always() && needs.package.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -162,7 +163,7 @@ jobs:
 
   publish:
     needs: consume
-    if: inputs.publish
+    if: always() && inputs.publish && needs.consume.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
