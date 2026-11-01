@@ -26,6 +26,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: anydoc-ios
+          cache-on-failure: true
       - run: cargo install cargo-about --locked
       - run: bun install --frozen-lockfile
       - run: bun run test
@@ -34,6 +35,8 @@ jobs:
         run: bun scripts/build-native.mjs host
       - name: Cross-compile device and simulator libraries (never boot a simulator)
         run: bun scripts/build-native.mjs ios
+      - name: Compile the Swift Expo adapter against SDK 58 (device build only)
+        run: bun scripts/check-expo.mjs ios
       - uses: actions/upload-artifact@v6
         with:
           name: anydoc-ios
@@ -50,11 +53,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: anydoc-android
+          cache-on-failure: true
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: sdkmanager 'ndk;27.1.12297006'
       - run: cargo install cargo-about --locked
       - name: Prebuild JNI and PDFium for all four Android ABIs
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.1.12297006" bun scripts/build-native.mjs android
+      - name: Compile the Kotlin Expo adapter against SDK 58 (no emulator)
+        run: bun scripts/check-expo.mjs android
       - uses: actions/upload-artifact@v6
         with:
           name: anydoc-android

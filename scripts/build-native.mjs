@@ -54,7 +54,7 @@ async function notices(vendor, destination) {
 await mkdir(output, { recursive: true });
 const platform = process.argv[2];
 if (platform === "host") {
-  const vendor = await download("pdfium-mac-arm64");
+  const vendor = await download(process.arch === "arm64" ? "pdfium-mac-arm64" : "pdfium-mac-x64");
   run("cargo", ["test", "--locked", "-p", "anydoc-mobile"], {
     PDFIUM_LIB_PATH: path.join(vendor, "lib"), PDFIUM_INCLUDE_PATH: path.join(vendor, "include"),
     ANYDOC_TEST_PDFIUM: path.join(vendor, "lib/libpdfium.dylib"),

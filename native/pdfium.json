@@ -3,6 +3,7 @@
   "tag": "chromium/8125",
   "assets": {
     "pdfium-mac-arm64": "4939bd935ac83ddc09a3a4f038bc43a19cea1660316a3667f26cb07a070e139d",
+    "pdfium-mac-x64": "8a5193535b80c7215d8932f6647ae5097465b6dba2811602c21e120c2af112b0",
     "pdfium-ios-device-arm64": "a9ab2295c65005d6fe81b11a172645160a5194ae55d1ffdf8444dd27124aad23",
     "pdfium-ios-simulator-arm64": "b2b5f0c918f661b9fe8de7dba3d3fee7d7df61db3247cfb0f3f910077af54f1b",
     "pdfium-ios-simulator-x64": "9ecdaf60af15bd51ace0c00ca829cec764307d3963a9c0764f9e803464ee217a",

@@ -24,3 +24,4 @@ __pycache__/
 /ios/.anydoc-install.lock
 /android/src/main/.anydoc-install.lock
 /android/Licenses/
+/native/expo-check/
