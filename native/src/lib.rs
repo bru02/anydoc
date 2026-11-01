@@ -123,8 +123,7 @@ fn extract_inner(
         if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("pdf")) {
             return extract_pdf(&path, pdfium_path, limits, ocr);
         }
-        let alias =
-            tempfile::Builder::new().prefix("anydoc-pdf-").tempdir().map_err(|e| e.to_string())?;
+        let alias = pdf_alias_directory(&path, &std::env::temp_dir()).map_err(|e| e.to_string())?;
         let pdf_path = alias.path().join("input.pdf");
         std::os::unix::fs::symlink(&path, &pdf_path).map_err(|e| e.to_string())?;
         return extract_pdf(&pdf_path, pdfium_path, limits, ocr);
@@ -163,6 +162,20 @@ fn extract_inner(
     let mut output = BoundedText::new(limits.max_chars);
     output.append(text.trim());
     Ok(output.finish(false, Vec::new()))
+}
+
+fn pdf_alias_directory(
+    path: &std::path::Path,
+    temporary: &std::path::Path,
+) -> std::io::Result<tempfile::TempDir> {
+    let mut builder = tempfile::Builder::new();
+    builder.prefix("anydoc-pdf-");
+    // Android <13 can report /data/local/tmp, which app processes cannot write.
+    // App-owned source directories provide a safe fallback without a byte copy.
+    builder.tempdir_in(temporary).or_else(|error| match path.parent() {
+        Some(parent) => builder.tempdir_in(parent),
+        None => Err(error),
+    })
 }
 
 fn extract_pdf(
@@ -370,6 +383,23 @@ mod android;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aliases_use_the_source_directory_when_global_temp_is_unavailable() {
+        let source = tempfile::tempdir().unwrap();
+        let input = source.path().join("cached-download");
+        std::fs::write(&input, b"%PDF-fixture").unwrap();
+        let alias = pdf_alias_directory(&input, &source.path().join("missing-temp")).unwrap();
+        assert_eq!(alias.path().parent(), Some(source.path()));
+        let link = alias.path().join("input.pdf");
+        std::os::unix::fs::symlink(&input, &link).unwrap();
+        assert_eq!(std::fs::read(link).unwrap(), b"%PDF-fixture");
+        let directory = alias.path().to_owned();
+        drop(alias);
+        assert!(!directory.exists());
+        assert!(input.exists());
+    }
+
     fn pdf(lines: &[&str]) -> Vec<u8> {
         pdf_fixture(lines, false)
     }
