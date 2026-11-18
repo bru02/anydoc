@@ -1,7 +1,7 @@
 [workspace]
 members = ["node", "python", "wasm", "native"]
 # cargo-fuzz keeps its own lockfile and nightly-only dependencies.
-exclude = ["fuzz"]
+exclude = ["fuzz", "native/third_party"]
 
 [package]
 name = "anydoc"
@@ -30,6 +30,12 @@ log = "0.4"
 pdf-inspector = "1.14.2"
 quick-xml = "0.41.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+
+# Native OCR hands the platform engine PDFium's 32-bit render without an RGB
+# conversion. See native/third_party/README.md.
+[patch.crates-io]
+liteparse = { path = "native/third_party/liteparse" }
+liteparse-pdfium = { path = "native/third_party/liteparse-pdfium" }
 
 [profile.release]
 lto = "thin"
