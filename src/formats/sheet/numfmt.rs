@@ -959,28 +959,24 @@ fn render_fraction(spec: &NumSpec, v: f64) -> Option<String> {
             Tok::Digit { region: Region::Int, .. } => {
                 out.push_str(&int_assigned.next().unwrap_or_default());
             }
-            Tok::Digit { region: Region::Num, .. } => {
-                if !hide {
+            Tok::Digit { region: Region::Num, .. }
+                if !hide => {
                     out.push_str(&num_assigned.next().unwrap_or_default());
                 }
-            }
-            Tok::Digit { region: Region::Den, .. } => {
-                if !hide {
+            Tok::Digit { region: Region::Den, .. }
+                if !hide => {
                     out.push_str(&den_assigned.next().unwrap_or_default());
                 }
-            }
-            Tok::Slash => {
-                if !hide {
+            Tok::Slash
+                if !hide => {
                     out.push('/');
                 }
-            }
-            Tok::Literal(s) => {
+            Tok::Literal(s)
                 // The fixed denominator is stored as a literal; it hides
                 // with the rest of the fraction.
-                if !(hide && spec.fixed_den.is_some_and(|d| d.to_string() == *s)) {
+                if !(hide && spec.fixed_den.is_some_and(|d| d.to_string() == *s)) => {
                     out.push_str(s);
                 }
-            }
             Tok::Percent => out.push('%'),
             Tok::Skip => out.push(' '),
             _ => {}
