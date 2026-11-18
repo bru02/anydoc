@@ -15,6 +15,10 @@ on:
         description: Reuse binaries from sdk58-package and package the current JS/metadata
         type: string
         default: ''
+      ios_native_run:
+        description: Optional native.yml run whose anydoc-ios artifact replaces the pinned native release
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -69,8 +73,21 @@ jobs:
           run-id: ${{ inputs.android_run }}
           github-token: ${{ github.token }}
           path: native/module-dist
+      - uses: actions/download-artifact@v7
+        if: matrix.platform == 'ios' && inputs.ios_native_run != ''
+        with:
+          name: anydoc-ios
+          run-id: ${{ inputs.ios_native_run }}
+          github-token: ${{ github.token }}
+          path: native/run-artifact
+      - name: Install the unreleased Rust/PDFium core from that run
+        if: matrix.platform == 'ios' && inputs.ios_native_run != ''
+        run: |
+          mkdir -p native/dist/ios ios/Frameworks
+          tar -xzf native/run-artifact/anydoc-ios.tar.gz -C native/dist/ios
+          cp -R native/dist/ios/. ios/Frameworks/
       - name: Fetch the SHA-verified Rust/PDFium core
-        if: matrix.platform != 'android' || inputs.android_run == ''
+        if: (matrix.platform != 'android' || inputs.android_run == '') && !(matrix.platform == 'ios' && inputs.ios_native_run != '')
         env:
           NATIVE_PLATFORM: ${{ matrix.platform }}
         run: |
@@ -169,7 +186,7 @@ jobs:
 
   publish:
     needs: consume
-    if: ${{ !cancelled() && inputs.publish && needs.consume.result == 'success' }}
+    if: ${{ !cancelled() && inputs.publish && inputs.ios_native_run == '' && needs.consume.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
