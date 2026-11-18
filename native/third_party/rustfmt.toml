@@ -1,0 +1,1 @@
+# Upstream LiteParse uses rustfmt defaults, not the workspace settings.

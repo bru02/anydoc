@@ -25,6 +25,21 @@ pub struct OcrResult {
     pub polygon: Option<[[f32; 2]; 4]>,
 }
 
+/// Layout of the page pixels an [`OcrEngine`] receives: rows tightly packed,
+/// top row first.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OcrPixelFormat {
+    /// 1 byte per pixel, Rec. 601 luma.
+    Gray8,
+    /// 3 bytes per pixel: red, green, blue.
+    #[default]
+    Rgb8,
+    /// 4 bytes per pixel: blue, green, red, then an unused byte. PDFium renders
+    /// this layout natively, so the page is rasterized into the buffer the
+    /// engine receives, with no conversion pass or second page-sized buffer.
+    Bgrx8,
+}
+
 pub struct OcrOptions {
     pub language: String,
     /// Resolution (pixels per inch) the page image was rendered at. OCR engines
@@ -45,6 +60,15 @@ pub trait OcrEngine: Send + Sync {
     /// that binarize internally (Tesseract) do; color-trained engines want RGB.
     fn prefers_grayscale(&self) -> bool {
         false
+    }
+    /// The pixel layout `recognize` receives. Defaults to [`OcrPixelFormat::Gray8`]
+    /// when [`Self::prefers_grayscale`], otherwise [`OcrPixelFormat::Rgb8`].
+    fn pixel_format(&self) -> OcrPixelFormat {
+        if self.prefers_grayscale() {
+            OcrPixelFormat::Gray8
+        } else {
+            OcrPixelFormat::Rgb8
+        }
     }
     fn recognize<'a, 'b: 'a, 'c: 'a>(
         &'a self,
@@ -68,6 +92,15 @@ pub trait OcrEngine: Send + Sync {
     /// that binarize internally (Tesseract) do; color-trained engines want RGB.
     fn prefers_grayscale(&self) -> bool {
         false
+    }
+    /// The pixel layout `recognize` receives. Defaults to [`OcrPixelFormat::Gray8`]
+    /// when [`Self::prefers_grayscale`], otherwise [`OcrPixelFormat::Rgb8`].
+    fn pixel_format(&self) -> OcrPixelFormat {
+        if self.prefers_grayscale() {
+            OcrPixelFormat::Gray8
+        } else {
+            OcrPixelFormat::Rgb8
+        }
     }
     fn recognize<'a, 'b: 'a, 'c: 'a>(
         &'a self,

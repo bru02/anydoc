@@ -1,7 +1,7 @@
 use jni::objects::{GlobalRef, JClass, JString, JValue};
 use jni::sys::{jlong, jstring};
 use jni::{JNIEnv, JavaVM};
-use liteparse::ocr::{OcrEngine, OcrOptions, OcrResult};
+use liteparse::ocr::{OcrEngine, OcrOptions, OcrPixelFormat, OcrResult};
 use std::{pin::Pin, sync::Arc};
 
 struct AndroidOcr {
@@ -11,6 +11,10 @@ struct AndroidOcr {
 impl OcrEngine for AndroidOcr {
     fn name(&self) -> &str {
         "ML Kit Latin"
+    }
+    /// `recognizeNative` expands tightly packed RGB into an ARGB `Bitmap`.
+    fn pixel_format(&self) -> OcrPixelFormat {
+        OcrPixelFormat::Rgb8
     }
     fn recognize<'a, 'b: 'a, 'c: 'a>(
         &'a self,

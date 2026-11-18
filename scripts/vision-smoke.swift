@@ -1,3 +1,4 @@
+import AnyDocCore
 import CoreGraphics
 import CoreText
 import Foundation
@@ -10,11 +11,12 @@ enum VisionSmoke {
   }
   static func run() throws {
     let width = 720, height = 240
-    var rgba = [UInt8](repeating: 255, count: width * height * 4)
-    rgba.withUnsafeMutableBytes { buffer in
+    // The layout Rust hands the callback: PDFium BGRx, rows tightly packed.
+    var bgrx = [UInt8](repeating: 255, count: width * height * 4)
+    bgrx.withUnsafeMutableBytes { buffer in
       let context = CGContext(data: buffer.baseAddress, width: width, height: height,
         bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
       context.setFillColor(CGColor(gray: 1, alpha: 1))
       context.fill(CGRect(x: 0, y: 0, width: width, height: height))
       context.textPosition = CGPoint(x: 30, y: 100)
@@ -24,13 +26,18 @@ enum VisionSmoke {
       ])
       CTLineDraw(CTLineCreateWithAttributedString(text), context)
     }
-    var rgb = [UInt8](repeating: 0, count: width * height * 3)
-    for pixel in 0..<(width * height) {
-      for channel in 0..<3 { rgb[pixel * 3 + channel] = rgba[pixel * 4 + channel] }
+    try bgrx.withUnsafeBufferPointer { buffer in
+      // Any other layout is refused rather than misread.
+      guard let result = nativeOcrRecognize(buffer.baseAddress, UInt64(buffer.count), UInt32(width), UInt32(height),
+        UInt32(ANYDOC_OCR_PIXELS_RGB8), 1) else { throw NSError(domain: "VisionSmoke", code: 3) }
+      defer { nativeOcrFree(result) }
+      guard String(cString: result).contains("\"error\"") else {
+        throw NSError(domain: "VisionSmoke", code: 4, userInfo: [NSLocalizedDescriptionKey: "Accepted an RGB layout"])
+      }
     }
     for mode: UInt32 in [1, 2] {
-      try rgb.withUnsafeBufferPointer { buffer in
-        guard let result = nativeOcrRecognize(buffer.baseAddress, UInt64(buffer.count), UInt32(width), UInt32(height), mode) else {
+      try bgrx.withUnsafeBufferPointer { buffer in
+        guard let result = nativeOcrRecognize(buffer.baseAddress, UInt64(buffer.count), UInt32(width), UInt32(height), nativeOcrPixelFormat, mode) else {
           throw NSError(domain: "VisionSmoke", code: 1)
         }
         defer { nativeOcrFree(result) }

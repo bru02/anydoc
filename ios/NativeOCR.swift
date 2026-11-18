@@ -3,13 +3,16 @@ import CoreGraphics
 import Foundation
 import Vision
 
-// Both callbacks run synchronously on the parser's background thread. The raw
-// RGB provider borrows Rust memory only for this call; it never enters JS.
-let nativeOcrRecognize: anydoc_ocr_recognize = { bytes, length, width, height, mode in
+// Both callbacks run synchronously on the parser's background thread. The page
+// pixels are PDFium's own BGRx render, borrowed from Rust only for this call
+// and wrapped in place: no conversion, no second page-sized buffer, never JS.
+let nativeOcrPixelFormat = UInt32(ANYDOC_OCR_PIXELS_BGRX8)
+
+let nativeOcrRecognize: anydoc_ocr_recognize = { pixels, length, width, height, format, mode in
   autoreleasepool {
     let response: Any
     do {
-      response = try NativeOCR.recognize(bytes: bytes, length: length, width: width, height: height, mode: mode)
+      response = try NativeOCR.recognize(pixels: pixels, length: length, width: width, height: height, format: format, mode: mode)
     } catch {
       response = ["error": String(reflecting: error)]
     }
@@ -22,26 +25,19 @@ let nativeOcrRecognize: anydoc_ocr_recognize = { bytes, length, width, height, m
 let nativeOcrFree: anydoc_ocr_free = { result in free(result) }
 
 private enum NativeOCR {
-  static func recognize(bytes: UnsafePointer<UInt8>?, length: UInt64, width: UInt32, height: UInt32, mode: UInt32) throws -> [[String: Any]] {
-    guard let bytes, width > 0, height > 0,
-      UInt64(width) * UInt64(height) * 3 == length,
-      let provider = CGDataProvider(dataInfo: nil, data: bytes, size: Int(length), releaseData: { _, _, _ in }),
-      let rgbImage = CGImage(width: Int(width), height: Int(height), bitsPerComponent: 8, bitsPerPixel: 24,
-        bytesPerRow: Int(width) * 3, space: CGColorSpaceCreateDeviceRGB(),
-        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue), provider: provider,
-        decode: nil, shouldInterpolate: false, intent: .defaultIntent) else {
+  static func recognize(pixels: UnsafePointer<UInt8>?, length: UInt64, width: UInt32, height: UInt32, format: UInt32, mode: UInt32) throws -> [[String: Any]] {
+    // 32-bit little-endian xRGB is BGRx in memory, so the image wraps the
+    // buffer instead of copying it. The provider never frees: Rust owns it.
+    guard let pixels, width > 0, height > 0, format == nativeOcrPixelFormat,
+      length <= UInt64(Int.max), length % (UInt64(width) * 4) == 0,
+      length / (UInt64(width) * 4) == UInt64(height),
+      let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+      let provider = CGDataProvider(dataInfo: nil, data: pixels, size: Int(length), releaseData: { _, _, _ in }),
+      let image = CGImage(width: Int(width), height: Int(height), bitsPerComponent: 8, bitsPerPixel: 32,
+        bytesPerRow: Int(width) * 4, space: colorSpace,
+        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
+        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else {
       throw NSError(domain: "AnyDoc", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid native OCR image"])
-    }
-    // Normalize the image to a conventional 32-bit format for Vision/Core ML.
-    // CoreGraphics performs this conversion natively; no encoded PNG or JS copy.
-    guard let context = CGContext(data: nil, width: Int(width), height: Int(height), bitsPerComponent: 8,
-      bytesPerRow: Int(width) * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else {
-      throw NSError(domain: "AnyDoc", code: 2, userInfo: [NSLocalizedDescriptionKey: "Cannot allocate native OCR image"])
-    }
-    context.draw(rgbImage, in: CGRect(x: 0, y: 0, width: Int(width), height: Int(height)))
-    guard let image = context.makeImage() else {
-      throw NSError(domain: "AnyDoc", code: 3, userInfo: [NSLocalizedDescriptionKey: "Cannot prepare native OCR image"])
     }
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = mode == 1 ? .fast : .accurate
@@ -55,6 +51,8 @@ private enum NativeOCR {
       }
     }
     #endif
+    // The handler and image are released when the callback's pool drains,
+    // before Rust frees the pixels.
     try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
     let tokens = try NSRegularExpression(pattern: "\\S+")
     var output: [[String: Any]] = []

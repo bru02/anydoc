@@ -63,6 +63,12 @@ adapter when changing them. OCR quality remains a runtime option.
   batch and runs one recognition job at a time. No images enter JS and no document
   is uploaded; the Android model is included in the app, available offline on
   first use. Other scripts/models are not bundled.
+- On iOS, each OCR page is rendered once and not copied: PDFium writes 32-bit
+  BGRx into the buffer that Vision's `CGImage` wraps in place (about 22 MB for
+  an A4 page at 240 DPI). The buffer is borrowed for the recognition call and
+  freed before the next page renders. Android renders RGB, and ML Kit's
+  `Bitmap` holds the ARGB copy it needs. `scripts/ocr-footprint.swift`
+  measures peak memory for the iOS path on macOS.
 - A failed PDF page preserves other readable pages and marks the result partial.
   Empty/image-only PDFs fail explicitly when OCR is off. Size/page/text caps are reported.
   A native OCR failure also marks retained text partial. If neither OCR nor

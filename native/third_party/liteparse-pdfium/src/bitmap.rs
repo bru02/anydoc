@@ -98,6 +98,37 @@ impl<'lib> Bitmap<'lib> {
         })
     }
 
+    /// Wrap caller-owned memory as a bitmap PDFium renders into. Dropping the
+    /// bitmap destroys only the handle; the buffer stays with the caller.
+    ///
+    /// # Safety
+    /// As [`Self::new`], and `buffer` must stay valid and unaliased for
+    /// `stride * height` bytes until the returned bitmap is dropped.
+    pub(crate) unsafe fn new_external(
+        width: i32,
+        height: i32,
+        format: i32,
+        buffer: *mut u8,
+        stride: i32,
+    ) -> Result<Self, PdfiumError> {
+        let handle = unsafe {
+            ffi!(FPDFBitmap_CreateEx(
+                width,
+                height,
+                format,
+                buffer.cast(),
+                stride
+            ))
+        };
+        if handle.is_null() {
+            return Err(PdfiumError::OperationFailed);
+        }
+        Ok(Bitmap {
+            handle,
+            _lib: PhantomData,
+        })
+    }
+
     pub fn handle(&self) -> pdfium_sys::FPDF_BITMAP {
         self.handle
     }

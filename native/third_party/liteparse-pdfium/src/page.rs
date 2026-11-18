@@ -484,23 +484,67 @@ impl<'doc, 'lib: 'doc> Page<'doc, 'lib> {
         }
     }
 
-    fn render_bitmap(
+    /// Render the page as tightly packed BGRx (4 bytes per pixel, blue first,
+    /// the fourth byte unused) straight into a buffer the caller owns.
+    /// [`Self::render_with_form`] plus a format conversion would hold two
+    /// page-sized buffers at once; this holds one, and it outlives the PDFium
+    /// lock. Returns the pixels, width and height.
+    pub fn render_bgrx_with_form(
         &self,
         dpi: f32,
         form: Option<&FormEnvironment>,
-    ) -> Result<Bitmap<'lib>, PdfiumError> {
+    ) -> Result<(Vec<u8>, u32, u32), PdfiumError> {
+        let _form_page = form.map(|form| self.notify_form_page_loaded(form));
+        let (width, height) = self.render_size(dpi);
+        let stride = width.checked_mul(4).filter(|_| width > 0 && height > 0);
+        let stride = stride.ok_or(PdfiumError::OperationFailed)?;
+        let length = (stride as usize).checked_mul(height as usize);
+        let mut pixels = vec![0; length.ok_or(PdfiumError::OperationFailed)?];
+        // SAFETY: the lock is held for `'lib` (see `render_bitmap`), and the
+        // bitmap borrowing `pixels` is dropped at the end of this block.
+        {
+            let bitmap = unsafe {
+                Bitmap::new_external(
+                    width,
+                    height,
+                    pdfium_sys::FPDFBitmap_BGRx as i32,
+                    pixels.as_mut_ptr(),
+                    stride,
+                )
+            }?;
+            self.draw(&bitmap, width, height, form);
+        }
+        Ok((pixels, width as u32, height as u32))
+    }
+
+    /// Pixel size of a render at `dpi`.
+    fn render_size(&self, dpi: f32) -> (i32, i32) {
         // `/UserUnit` scales the physical page, so honoring the requested
         // DPI means scaling the pixel size by it too — otherwise a UserUnit
         // page renders at dpi/user_unit and its text rasterizes microscopic.
         let scale = dpi / 72.0 * self.user_unit;
         let width = (self.width() * scale).round() as i32;
         let height = (self.height() * scale).round() as i32;
+        (width, height)
+    }
+
+    fn render_bitmap(
+        &self,
+        dpi: f32,
+        form: Option<&FormEnvironment>,
+    ) -> Result<Bitmap<'lib>, PdfiumError> {
+        let (width, height) = self.render_size(dpi);
 
         // SAFETY: this method is on `Page<'_, 'lib>`, whose existence proves
         // the PDFium lock is held for `'lib`; the returned `Bitmap<'lib>` is
         // tied to that same lock lifetime.
         let bitmap = unsafe { Bitmap::new(width, height) }?;
+        self.draw(&bitmap, width, height, form);
+        Ok(bitmap)
+    }
 
+    /// Paint the page onto opaque white, then the form layer when supplied.
+    fn draw(&self, bitmap: &Bitmap<'lib>, width: i32, height: i32, form: Option<&FormEnvironment>) {
         // Fill with white (ARGB: 0xFFFFFFFF)
         bitmap.fill_rect(0, 0, width, height, 0xFFFFFFFF);
 
@@ -536,8 +580,6 @@ impl<'doc, 'lib: 'doc> Page<'doc, 'lib> {
                 ));
             }
         }
-
-        Ok(bitmap)
     }
 
     /// Union of all top-level page object bounds, in PDF page space.

@@ -21,7 +21,7 @@ public final class AnyDocModule: Module {
           return ["status": "extraction-failed", "detail": "Application frameworks directory is unavailable"]
         }
         let pdfiumPath = frameworks.appendingPathComponent("pdfium.framework/pdfium").path
-        guard let result = anydoc_mobile_extract(path, filename, pdfiumPath, UInt64(maxBytes), UInt32(maxChars), UInt32(maxPages), UInt32(ocrMode), nativeOcrRecognize, nativeOcrFree) else {
+        guard let result = anydoc_mobile_extract(path, filename, pdfiumPath, UInt64(maxBytes), UInt32(maxChars), UInt32(maxPages), UInt32(ocrMode), nativeOcrPixelFormat, nativeOcrRecognize, nativeOcrFree) else {
           return ["status": "extraction-failed", "detail": "Native parser returned no result"]
         }
         defer { anydoc_mobile_free(result) }

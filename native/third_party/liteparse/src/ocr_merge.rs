@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::error::LiteParseError;
-use crate::ocr::{OcrEngine, OcrOptions, OcrResult};
+use crate::ocr::{OcrEngine, OcrOptions, OcrPixelFormat, OcrResult};
 use crate::types::{CutAxis, Page, ParsedPage, Rect, Region, RegionKind, TextItem, WordBox};
 #[cfg(target_arch = "wasm32")]
 use futures_util::{
@@ -53,7 +53,8 @@ pub struct OcrRaster {
     /// this number, so a raster can be merged into any page slice that
     /// contains its page.
     pub page_number: usize,
-    /// Tightly-packed pixels: 1 byte/px (grayscale) or 3 (RGB). Serialized
+    /// Tightly-packed pixels in the engine's `OcrEngine::pixel_format`: 1 byte/px
+    /// (grayscale), 3 (RGB) or 4 (BGRx). Serialized
     /// as a base64 string, since a JSON array of numbers is ~3.5× the size.
     #[serde(with = "base64_bytes")]
     pub pixels: Vec<u8>,
@@ -84,8 +85,8 @@ pub struct OcrRenderOptions {
     pub max_rasters: usize,
     /// Requested render resolution; clamped per page by the long-edge cap.
     pub dpi: f32,
-    /// Emit 1 byte/px luma instead of RGB (see `OcrEngine::prefers_grayscale`).
-    pub grayscale: bool,
+    /// Pixel layout to emit (see `OcrEngine::pixel_format`).
+    pub pixel_format: OcrPixelFormat,
     /// Paint form-field appearances into the raster (runs document actions).
     pub render_form_fields: bool,
     /// Keep going when one page fails to render (it keeps its native text).
@@ -106,7 +107,7 @@ impl Default for OcrRenderOptions {
         Self {
             max_rasters: 0,
             dpi: crate::config::DEFAULT_DPI,
-            grayscale: false,
+            pixel_format: OcrPixelFormat::Rgb8,
             render_form_fields: false,
             continue_on_page_error: false,
             reflatten_pages: HashSet::new(),
@@ -892,15 +893,15 @@ pub(crate) fn render_pages_for_ocr_capped(
     let OcrRenderOptions {
         max_rasters: _,
         dpi,
-        grayscale,
+        pixel_format,
         render_form_fields,
         continue_on_page_error,
         reflatten_pages: flatten_page_numbers,
         selection,
     } = options;
-    let (dpi, grayscale, render_form_fields, continue_on_page_error) = (
+    let (dpi, pixel_format, render_form_fields, continue_on_page_error) = (
         *dpi,
-        *grayscale,
+        *pixel_format,
         *render_form_fields,
         *continue_on_page_error,
     );
@@ -976,14 +977,18 @@ pub(crate) fn render_pages_for_ocr_capped(
                 }
             }
 
-            let bitmap = page_obj.render_with_form(eff_dpi, form.as_ref())?;
-            let width = bitmap.width() as u32;
-            let height = bitmap.height() as u32;
-            // Grayscale or RGB per the engine; see `OcrEngine::prefers_grayscale`.
-            let pixels = if grayscale {
-                bitmap.to_luma()
-            } else {
-                bitmap.to_rgb()
+            // The engine's layout; see `OcrEngine::pixel_format`. BGRx is
+            // rendered in place, the others converted from PDFium's BGRA.
+            let (pixels, width, height) = match pixel_format {
+                OcrPixelFormat::Bgrx8 => page_obj.render_bgrx_with_form(eff_dpi, form.as_ref())?,
+                format => {
+                    let bitmap = page_obj.render_with_form(eff_dpi, form.as_ref())?;
+                    let pixels = match format {
+                        OcrPixelFormat::Gray8 => bitmap.to_luma(),
+                        _ => bitmap.to_rgb(),
+                    };
+                    (pixels, bitmap.width() as u32, bitmap.height() as u32)
+                }
             };
 
             let image_rects = if has_native_text {

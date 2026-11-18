@@ -11,11 +11,11 @@ use crate::config::{LiteParseConfig, parse_target_pages};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::conversion;
 use crate::error::LiteParseError;
-use crate::ocr::OcrEngine;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::ocr::http_simple::HttpOcrEngine;
 #[cfg(feature = "tesseract")]
 use crate::ocr::tesseract::TesseractOcrEngine;
+use crate::ocr::{OcrEngine, OcrPixelFormat};
 
 use crate::stages;
 use crate::types::{
@@ -343,7 +343,7 @@ impl LiteParse {
     /// the widgets instead, so no re-flatten is needed.
     pub fn ocr_render_options(
         &self,
-        grayscale: bool,
+        pixel_format: OcrPixelFormat,
         extracted: &stages::ExtractedPages,
     ) -> stages::OcrRenderOptions {
         let reflatten_pages = if extracted.flattened_form_widgets && !self.config.render_form_fields
@@ -359,7 +359,7 @@ impl LiteParse {
             // by free slots and ignores this field.
             max_rasters: self.config.num_workers.max(1),
             dpi: self.config.dpi,
-            grayscale,
+            pixel_format,
             render_form_fields: self.config.render_form_fields,
             continue_on_page_error: self.config.continue_on_page_error,
             reflatten_pages,
@@ -641,10 +641,12 @@ impl LiteParse {
         // projection (pure Rust) do not touch PDFium, so they can run
         // concurrently with other `LiteParse` calls.
         let password = self.config.password.as_deref();
-        // Build the OCR engine up front so the renderer knows whether to emit a
-        // grayscale buffer (cheaper, for engines that binarize internally) or RGB.
+        // Build the OCR engine up front so the renderer knows which pixel
+        // layout to emit (see `OcrEngine::pixel_format`).
         let ocr_engine = self.ocr_engine()?;
-        let ocr_grayscale = ocr_engine.as_ref().is_some_and(|e| e.prefers_grayscale());
+        let ocr_pixel_format = ocr_engine
+            .as_ref()
+            .map_or(OcrPixelFormat::Rgb8, |e| e.pixel_format());
 
         #[allow(unused_mut)] // mutated only by the native image-output writer
         let (
@@ -709,7 +711,7 @@ impl LiteParse {
                 stages::extract(&document, &self.extract_request(target_pages, max_pages))?;
             // Derived here, before the document is dropped, so the OCR rounds
             // below reproduce exactly what extraction did to it.
-            let ocr_render_options = self.ocr_render_options(ocr_grayscale, &extracted);
+            let ocr_render_options = self.ocr_render_options(ocr_pixel_format, &extracted);
             let screenshot_options = self.screenshot_options(self.config.continue_on_page_error);
             // Reopening the input costs a full parse, so it is confined to the
             // one consumer that genuinely needs live widget annotations: the

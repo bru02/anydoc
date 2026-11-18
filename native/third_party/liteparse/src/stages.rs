@@ -49,7 +49,7 @@ use crate::types::{
 pub use crate::extract::{ExtractedPages, ExtractionOutputOptions};
 pub use crate::layout::{LayoutBlock, LayoutCell};
 pub use crate::markdown_layout::{Block, Cell, PositionedBlock, SpanCell, render_blocks};
-pub use crate::ocr::OcrResult;
+pub use crate::ocr::{OcrPixelFormat, OcrResult};
 pub use crate::ocr_merge::{
     ComplexityReason, LayoutComplexityReason, LayoutComplexityStats, OcrRaster, OcrRenderOptions,
     PageComplexityStats, PageOcrOutcome,

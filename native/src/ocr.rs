@@ -5,13 +5,33 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use liteparse::ocr::{OcrEngine, OcrOptions, OcrResult};
+use liteparse::ocr::{OcrEngine, OcrOptions, OcrPixelFormat, OcrResult};
 use serde::Deserialize;
 
 type OcrError = Box<dyn std::error::Error + Send + Sync>;
 
-pub type RecognizeCallback = unsafe extern "C" fn(*const u8, u64, u32, u32, u32) -> *mut c_char;
+/// `(pixels, length, width, height, pixel_format, mode)`; see `anydoc_mobile.h`.
+pub type RecognizeCallback =
+    unsafe extern "C" fn(*const u8, u64, u32, u32, u32, u32) -> *mut c_char;
 pub type FreeCallback = unsafe extern "C" fn(*mut c_char);
+
+/// `ANYDOC_OCR_PIXELS_*` in `anydoc_mobile.h`.
+pub fn pixel_format(value: u32) -> Option<OcrPixelFormat> {
+    match value {
+        0 => Some(OcrPixelFormat::Rgb8),
+        1 => Some(OcrPixelFormat::Bgrx8),
+        2 => Some(OcrPixelFormat::Gray8),
+        _ => None,
+    }
+}
+
+fn pixel_format_value(format: OcrPixelFormat) -> u32 {
+    match format {
+        OcrPixelFormat::Rgb8 => 0,
+        OcrPixelFormat::Bgrx8 => 1,
+        OcrPixelFormat::Gray8 => 2,
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct OcrConfig {
@@ -52,6 +72,9 @@ impl OcrEngine for TrackedEngine {
     fn name(&self) -> &str {
         self.inner.name()
     }
+    fn pixel_format(&self) -> OcrPixelFormat {
+        self.inner.pixel_format()
+    }
     fn recognize<'a, 'b: 'a, 'c: 'a>(
         &'a self,
         data: &'c [u8],
@@ -71,11 +94,14 @@ impl OcrEngine for TrackedEngine {
     }
 }
 
-/// An iOS callback borrows raw RGB only until it returns owned UTF-8 JSON.
+/// A platform callback borrows the page pixels only until it returns owned
+/// UTF-8 JSON. They are rendered in the layout the host asked for, so it can
+/// wrap them without converting or copying.
 pub struct CallbackEngine {
     pub recognize: RecognizeCallback,
     pub free: FreeCallback,
     pub mode: u32,
+    pub pixel_format: OcrPixelFormat,
 }
 
 #[derive(Deserialize)]
@@ -112,6 +138,9 @@ impl OcrEngine for CallbackEngine {
     fn name(&self) -> &str {
         "Apple Vision"
     }
+    fn pixel_format(&self) -> OcrPixelFormat {
+        self.pixel_format
+    }
     fn recognize<'a, 'b: 'a, 'c: 'a>(
         &'a self,
         data: &'c [u8],
@@ -120,8 +149,9 @@ impl OcrEngine for CallbackEngine {
         _options: &'b OcrOptions,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<OcrResult>, OcrError>> + Send + '_>> {
         Box::pin(async move {
+            let format = pixel_format_value(self.pixel_format);
             let result = unsafe {
-                (self.recognize)(data.as_ptr(), data.len() as u64, width, height, self.mode)
+                (self.recognize)(data.as_ptr(), data.len() as u64, width, height, format, self.mode)
             };
             if result.is_null() {
                 return Err("Native OCR returned no result".into());

@@ -331,6 +331,7 @@ pub unsafe extern "C" fn anydoc_mobile_extract(
     max_chars: u32,
     max_pages: u32,
     ocr_mode: u32,
+    ocr_pixel_format: u32,
     recognize: Option<ocr::RecognizeCallback>,
     free_ocr: Option<ocr::FreeCallback>,
 ) -> *mut c_char {
@@ -351,6 +352,8 @@ pub unsafe extern "C" fn anydoc_mobile_extract(
                 recognize: recognize.ok_or("Native OCR callback is missing")?,
                 free: free_ocr.ok_or("Native OCR release callback is missing")?,
                 mode: ocr_mode,
+                pixel_format: ocr::pixel_format(ocr_pixel_format)
+                    .ok_or("Unknown native OCR pixel format")?,
             };
             OcrConfig::native(ocr_mode, Arc::new(engine)).map_err(|_| "Invalid OCR mode")?
         };
@@ -409,7 +412,7 @@ mod tests {
         for line in lines {
             let page = objects.len() + 1;
             kids.push(format!("{page} 0 R"));
-            let drawing = if scan { "q 0 0 0 rg 20 20 150 120 re f Q\n" } else { "" };
+            let drawing = if scan { "q 1 0 0 rg 20 20 150 120 re f Q\n" } else { "" };
             let stream = format!("{drawing}BT /F1 12 Tf 10 100 Td ({line}) Tj ET\n");
             objects.push(format!("<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents {} 0 R/Resources<</Font<</F1 {} 0 R>>>>>>", page + 1, page + 2));
             objects.push(format!("<</Length {}>>stream\n{stream}endstream", stream.len()));
@@ -443,9 +446,11 @@ mod tests {
             length: u64,
             width: u32,
             height: u32,
+            format: u32,
             _mode: u32,
         ) -> *mut c_char {
-            assert_eq!(length, u64::from(width) * u64::from(height) * 3);
+            assert_eq!(format, 1);
+            assert_eq!(length, u64::from(width) * u64::from(height) * 4);
             WIDTH.store(width, Ordering::Relaxed);
             CString::new(
                 r#"[{"text":"Native OCR marker","bbox":[20,20,180,50],"confidence":0.99}]"#,
@@ -466,7 +471,8 @@ mod tests {
         assert_eq!(WIDTH.load(Ordering::Relaxed), 0);
         let mut widths = Vec::new();
         for mode in [1, 2] {
-            let engine = ocr::CallbackEngine { recognize, free: release, mode };
+            let pixel_format = ocr::pixel_format(1).unwrap();
+            let engine = ocr::CallbackEngine { recognize, free: release, mode, pixel_format };
             let config = OcrConfig::native(mode, Arc::new(engine)).unwrap();
             let result = extract_file_with_ocr(path, "scan.pdf", &pdfium, limits(), config);
             assert_eq!(result.status, "ok", "{result:?}");
@@ -534,12 +540,76 @@ mod tests {
     }
 
     #[test]
+    fn native_ocr_receives_each_pixel_layout_it_asks_for() {
+        use std::sync::Mutex;
+        struct Seen {
+            format: u32,
+            depth: u64,
+            corner: Vec<u8>,
+            center: Vec<u8>,
+        }
+        static SEEN: Mutex<Vec<Seen>> = Mutex::new(Vec::new());
+        unsafe extern "C" fn recognize(
+            bytes: *const u8,
+            length: u64,
+            width: u32,
+            height: u32,
+            format: u32,
+            _mode: u32,
+        ) -> *mut c_char {
+            let pixels = unsafe { std::slice::from_raw_parts(bytes, length as usize) };
+            let size = u64::from(width) * u64::from(height);
+            let depth = length / size;
+            assert_eq!(depth * size, length);
+            let pixel = |x: u32, y: u32| {
+                let start = ((u64::from(y) * u64::from(width) + u64::from(x)) * depth) as usize;
+                pixels[start..start + depth as usize].to_vec()
+            };
+            let corner = pixel(0, 0);
+            let center = pixel(width / 2, height / 2);
+            SEEN.lock().unwrap().push(Seen { format, depth, corner, center });
+            CString::new("[]").unwrap().into_raw()
+        }
+        unsafe extern "C" fn release(value: *mut c_char) {
+            drop(unsafe { CString::from_raw(value) });
+        }
+        let pdfium =
+            std::env::var("ANYDOC_TEST_PDFIUM").expect("Run bun scripts/build-native.mjs host");
+        let file = tempfile::Builder::new().suffix(".pdf").tempfile().unwrap();
+        // A red rectangle over the page center, on white.
+        std::fs::write(file.path(), pdf_fixture(&[" "], true)).unwrap();
+        let path = file.path().to_str().unwrap();
+        for format in [0, 1, 2] {
+            let pixel_format = ocr::pixel_format(format).unwrap();
+            let engine = ocr::CallbackEngine { recognize, free: release, mode: 1, pixel_format };
+            let config = OcrConfig::native(1, Arc::new(engine)).unwrap();
+            extract_file_with_ocr(path, "scan.pdf", &pdfium, limits(), config);
+        }
+        assert!(ocr::pixel_format(3).is_none());
+        let seen = SEEN.lock().unwrap();
+        let summary: Vec<_> = seen.iter().map(|page| (page.format, page.depth)).collect();
+        assert_eq!(summary, [(0, 3), (1, 4), (2, 1)]);
+        for page in seen.iter() {
+            // BGRx leaves its fourth byte unspecified; only color bytes count.
+            let color = page.depth.min(3) as usize;
+            assert_eq!(page.corner[..color], [255, 255, 255][..color], "white page corner");
+            let red: &[u8] = match page.format {
+                0 => &[255, 0, 0],
+                1 => &[0, 0, 255],
+                _ => &[76],
+            };
+            assert_eq!(&page.center[..color], red, "red rectangle");
+        }
+    }
+
+    #[test]
     fn a_native_ocr_failure_preserves_other_embedded_text() {
         unsafe extern "C" fn unavailable(
             _data: *const u8,
             _length: u64,
             _width: u32,
             _height: u32,
+            _format: u32,
             _mode: u32,
         ) -> *mut c_char {
             CString::new(r#"{"error":"Recognizer unavailable"}"#).unwrap().into_raw()
@@ -551,7 +621,12 @@ mod tests {
             std::env::var("ANYDOC_TEST_PDFIUM").expect("Run bun scripts/build-native.mjs host");
         let file = tempfile::Builder::new().suffix(".pdf").tempfile().unwrap();
         std::fs::write(file.path(), pdf_fixture(&["Native embedded marker", " "], true)).unwrap();
-        let engine = ocr::CallbackEngine { recognize: unavailable, free: release, mode: 2 };
+        let engine = ocr::CallbackEngine {
+            recognize: unavailable,
+            free: release,
+            mode: 2,
+            pixel_format: Default::default(),
+        };
         let config = OcrConfig::native(2, Arc::new(engine)).unwrap();
         let result = extract_file_with_ocr(
             file.path().to_str().unwrap(),

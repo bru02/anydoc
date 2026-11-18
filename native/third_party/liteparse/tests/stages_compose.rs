@@ -193,7 +193,9 @@ async fn compose(parser: &LiteParse, input: PdfInput) -> ParseResult {
     let want_doc_meta = config.extract_document_metadata && !_guard.is_converted();
 
     let engine = parser.ocr_engine().unwrap();
-    let grayscale = engine.as_ref().is_some_and(|e| e.prefers_grayscale());
+    let pixel_format = engine
+        .as_ref()
+        .map_or(Default::default(), |e| e.pixel_format());
 
     // ── pdfium-bound: open, document facts, extract, complexity, screenshots
     let lib = Library::init();
@@ -230,7 +232,7 @@ async fn compose(parser: &LiteParse, input: PdfInput) -> ParseResult {
         &parser.extract_request(target_pages.as_deref(), config.max_pages),
     )
     .unwrap();
-    let ocr_render_options = parser.ocr_render_options(grayscale, &extracted);
+    let ocr_render_options = parser.ocr_render_options(pixel_format, &extracted);
     let screenshot_options = parser.screenshot_options(config.continue_on_page_error);
     // Extraction may have flattened form widgets into the open document;
     // screenshots that paint form fields need a document it did not touch.
